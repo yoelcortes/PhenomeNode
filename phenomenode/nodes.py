@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 """
-from .phenomenode import PhenomeNode
-from .edge import Stream
+from .node import Node
 from .variable import ActiveVariables
 
-class SurgeTank(PhenomeNode):
+__all__ = ('SurgeTank', 'Bulk', 'Mix', 'Mixer')
+
+class SurgeTank(Node):
     n_ins = 1
     n_outs = 1
-    etype = Stream
     
     def equations(self, fmt=None, context=None, start=None):
         head, dlim, start = self._equations_format(start)
@@ -17,16 +17,16 @@ class SurgeTank(PhenomeNode):
         return head + dlim.join([f"{i(fmt)} = {j(fmt)}"
                                  for i, j in zip(inlet, outlet)])
 
-class Bulk(PhenomeNode):
+class Bulk(Node):
     n_ins = 1
     n_outs = 1
-    etype = Stream
     
     def load(self):
         feed, = self.ins
         product, = self.outs
-        assert feed.variables == {feed.Fcp, feed.T, feed.P}
-        product.variables = ActiveVariables(product.Fc, product.H, product.P)
+        index = self.index
+        assert feed.variables == {index.Fcp, index.T, index.P}
+        product.variables = ActiveVariables(index.Fc, index.H, index.P)
     
     def equations(self, fmt=None, context=None, start=None):
         head, dlim, start = self._equations_format(start)
@@ -45,15 +45,16 @@ class Bulk(PhenomeNode):
         ])
         
 
-class Mix(PhenomeNode):
+class Mix(Node):
     n_ins = 2
     n_outs = 1
-    etype = Stream
     
     def load(self):
         product, = self.outs
-        for i in self.ins: assert i.variables == {i.Fc, i.H, i.P}
-        product.variables = ActiveVariables(product.Fc, product.H, product.P)
+        index = self.index
+        bulk_variables = {index.Fc, index.H, index.P}
+        for i in self.ins: assert i.variables == bulk_variables
+        product.variables = ActiveVariables(index.Fc, index.H, index.P)
     
     def equations(self, fmt=None, context=None, start=None):
         head, dlim, start = self._equations_format(start)
@@ -72,7 +73,7 @@ class Mix(PhenomeNode):
         ])
     
     
-class Mixer(PhenomeNode, tag='mr'):
+class Mixer(Node, tag='mr'):
     n_ins = 2
     n_outs = 1
     

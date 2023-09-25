@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """
 """
-from .context import ContextStack
+from .context import ContextStack, Chemical, Phase
+
+__all__ = ('Variable', 'ActiveVariables', 'variable_index')
 
 class Variable:
     __slots__ = ('name', 'context', '_hash')
@@ -48,4 +50,29 @@ class ActiveVariables(frozenset):
         if context is None: return self
         return ActiveVariables(*[i.framed(context) for i in self])
     
+
+default_chemicals = Chemical.family(['Water'])
+default_phases = Phase.family(['g', 'l'])
+
+class VariableIndex:
+    T = Variable('T')
+    P = Variable('P')
+    H = Variable('H')
+    S = Variable('S')
+    G = Variable('G')
+    A = Variable('A')
+    V = Variable('V')
+    F = Variable('F')
     
+    def load(self, chemicals=None, phases=None):
+        if chemicals is None: chemicals = default_chemicals
+        if phases is None: phases = default_phases
+        self.chemicals = chemicals
+        self.phases = phases
+        self.Fcp = Variable('F', ContextStack(chemicals, phases))
+        self.Fc = Variable('F', chemicals)
+        self.KVc = Variable('KV', chemicals)
+        self.KLc = Variable('KL', chemicals)
+
+variable_index = VariableIndex()
+variable_index.load()

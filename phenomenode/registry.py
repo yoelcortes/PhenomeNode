@@ -2,6 +2,8 @@
 """
 """
 
+__all__ = ('Registry',)
+
 class Registry:
     __slots__ = ('contexts', 'context_levels')
         

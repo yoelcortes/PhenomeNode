@@ -4,9 +4,11 @@
 from .edge import Edge
 from .context import Inlet, Outlet
 
-class Gateway:
+__all__ = ('Inlets', 'Outlets')
+
+class Gate:
     """
-    Abstract class for a sequence of edges for a node.
+    Abstract class for a sequence of edges entering or exiting a node.
     
     Abstract methods:
         * _dock(self, edge) -> Edge
@@ -17,27 +19,26 @@ class Gateway:
     """
     __slots__ = ('edges',)
         
-    def __init__(self, size, edges=None, etype=None):
-        if etype is None: etype = Edge
+    def __init__(self, size, edges=None, index=None):
         dock = self._dock
         isa = isinstance
         if edges is None:
-            self.edges = [self._create_edge(etype) for i in range(size)]
+            self.edges = [self._create_edge(index) for i in range(size)]
         elif isa(edges, Edge):
             self.edges = [dock(edges)]
         elif hasattr(edges, '__iter__'):
             self.edges = []
             for i in edges:
-                if isa(i, etype):
+                if isa(i, Edge):
                     s = dock(i)
                 elif i is None:
-                    s = self._create_edge(etype)
+                    s = self._create_edge(index)
                 else:
                     raise TypeError(f"{i!r} is not an edge")
                 self.edges.append(s)
         
-    def _create_edge(self, etype):
-        return etype(None, None)
+    def _create_edge(self):
+        return Edge(None, None)
         
     def __add__(self, other):
         return self.edges + other
@@ -157,13 +158,13 @@ class Gateway:
         return repr(self.edges)
 
 
-class Inlets(Gateway):
+class Inlets(Gate):
     """Create an Inlets object which serves as inlet edges for a node."""
     __slots__ = ('sink',)
     
-    def __init__(self, sink, size, edges, etype):
+    def __init__(self, sink, size, edges, index):
         self.sink = sink
-        super().__init__(size, edges, etype)
+        super().__init__(size, edges, index)
     
     def framed_variables(self, context, family=False):
         edges = self.edges
@@ -174,8 +175,8 @@ class Inlets(Gateway):
         else:
             return [i.framed_variables(context + Inlet(n)) for n, i in enumerate(self.edges)]
     
-    def _create_edge(self, etype):
-        return etype(None, [self.sink])
+    def _create_edge(self, index):
+        return Edge(None, [self.sink], index)
     
     def _dock(self, edge): 
         edge.sinks.append(self.sink)
@@ -185,13 +186,13 @@ class Inlets(Gateway):
     #     edge.sinks.remove(self.sink)
     
         
-class Outlets(Gateway):
+class Outlets(Gate):
     """Create an Outlets object which serves as outlet edges for a node."""
     __slots__ = ('source',)
     
-    def __init__(self, source, size, edges, etype):
+    def __init__(self, source, size, edges, index):
         self.source = source
-        super().__init__(size, edges, etype)
+        super().__init__(size, edges, index)
     
     def framed_variables(self, context, family=False):
         edges = self.edges
@@ -202,8 +203,8 @@ class Outlets(Gateway):
         else:
             return [i.framed_variables(context + Outlet(n)) for n, i in enumerate(self.edges)]
     
-    def _create_edge(self, etype):
-        return etype([self.source], None)
+    def _create_edge(self, index):
+        return Edge([self.source], None, index)
     
     def _dock(self, edge): 
         edge.sources.append(self.source)

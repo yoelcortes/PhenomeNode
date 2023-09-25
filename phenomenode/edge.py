@@ -2,14 +2,20 @@
 """
 """
 from .context import ContextStack, Chemical, Phase
-from .variable import Variable
+from .variable import Variable, ActiveVariables, variable_index
+
+__all__ = ('Edge',)
+
 class Edge:
-    __slots__ = ('sources', 'sinks', 'variables')
-    
-    def __init__(self, sources=None, sinks=None, variables=None):
+    __slots__ = ('sources', 'sinks', 'variables', 'index')
+        
+    def __init__(self, sources=None, sinks=None, index=None, variables=None):
+        if index is None: index = variable_index
+        if variables is None: variables = ActiveVariables(index.Fcp, index.T, index.P)
         self.sources = [] if sources is None else sources
         self.sinks = [] if sinks is None else sinks
-        self.variables = () if variables is None else variables
+        self.variables = variables
+        self.index = index
     
     def __call__(self, fmt=None, context=None, dlim=None):
         if dlim is None: dlim = '\n'
@@ -31,47 +37,4 @@ class Edge:
 
     def __repr__(self):
         return f"{type(self).__name__}({self.sources!r}, {self.sinks!r})"
-
-
-class ActiveVariables(frozenset):
     
-    def __new__(cls, *variables):
-        self = super().__new__(cls, variables)
-        for i in variables: setattr(self, i(-1), i)
-        return self
-    
-    def framed(self, context=None):
-        if context is None: return self
-        return ActiveVariables(*[i.framed(context) for i in self])
-    
-
-class Stream(Edge):
-    __slots__ = (
-        'chemicals', 'phases',
-    )
-    default_chemicals = Chemical.family(['Water'])
-    default_phases = Phase.family(['g', 'l'])
-    T = Variable('T')
-    P = Variable('P')
-    H = Variable('H')
-    S = Variable('S')
-    G = Variable('G')
-    A = Variable('A')
-    V = Variable('V')
-    F = Variable('F')
-    
-    @property
-    def Fcp(self):
-        return Variable('F', ContextStack(self.chemicals, self.phases))
-    @property
-    def Fc(self):
-        return Variable('F', self.chemicals)
-    
-    def __init__(self, sources=None, sinks=None, chemicals=None, phases=None,
-                 variables=None):
-        if chemicals is None: chemicals = self.default_chemicals
-        if phases is None: phases = self.default_phases
-        self.chemicals = chemicals
-        self.phases = phases
-        if variables is None: variables = ActiveVariables(self.Fcp, self.T, self.P)
-        super().__init__(sources, sinks, variables)

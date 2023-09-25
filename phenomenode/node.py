@@ -1,22 +1,25 @@
 # -*- coding: utf-8 -*-
 """
 """
+from .variable import variable_index
 from .context import ContextItem 
-from .gateway import Inlets, Outlets
+from .gate import Inlets, Outlets
 from .registry import Registry
-from .edge import Stream
+
+__all__ = ('PhenomeNode', 'Node',)
 
 class PhenomeNode(ContextItem, tag='n'):
-    __slots__ = ('ins', 'outs', 'nodes')
-    etype = Stream
+    __slots__ = ('ins', 'outs', 'nodes', 'index')
     registry = Registry()
     n_ins = 0
     n_outs = 0
     
-    def __new__(cls, name=None, ins=None, outs=None):
+    def __new__(cls, name=None, ins=None, outs=None, index=None):
+        if index is None: index = variable_index
         self = super().__new__(cls, name)
-        self.ins = Inlets(self, self.n_ins, ins, self.etype)
-        self.outs = Outlets(self, self.n_outs, outs, self.etype)
+        self.index = index
+        self.ins = Inlets(self, self.n_ins, ins, index)
+        self.outs = Outlets(self, self.n_outs, outs, index)
         self.registry.open_context_level()
         self.load()
         self.nodes = self.registry.close_context_level()
@@ -73,3 +76,5 @@ class PhenomeNode(ContextItem, tag='n'):
     #         head + self.equations(fmt, dlim=dlim)
     #     )
     _ipython_display_ = show
+    
+Node = PhenomeNode

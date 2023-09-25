@@ -2,6 +2,9 @@
 """
 """
 
+__all__ = ('ContextStack', 'ContextFamily', 'ContextItem',
+           'Inlet', 'Outlet', 'Phase', 'Chemical')
+
 def format_name(line):
     words = []
     word = ''
