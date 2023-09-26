@@ -2,7 +2,7 @@
 """
 """
 from .variable import variable_index
-from .context import ContextItem 
+from .context import ContextItem, ContextStack
 from .gate import Inlets, Outlets
 from .registry import Registry
 
@@ -26,6 +26,9 @@ class PhenomeNode(ContextItem, tag='n'):
         self.registry.register(self)
         return self
     
+    def contextualize(self, context):
+        return ContextStack() if context is None else context + self
+    
     def load(self): pass
     
     def __enter__(self):
@@ -42,28 +45,33 @@ class PhenomeNode(ContextItem, tag='n'):
         feeds = [i for i in inlets if not i.sources]
         outlets = sum([i.outs for i in nodes], [])
         products = [i for i in outlets if not i.sinks]   
-        self.ins[:] = feeds
-        self.outs[:] = products
+        self.ins.edges[:] = feeds
+        self.outs.edges[:] = products
+        for i in feeds: i.sinks.insert(0, self)
+        for i in products: i.sources.insert(0, self)
         if exception: raise exception
     
-    def _equations_format(self, start):
-        head = f"{type(self).__name__}({self.name}): "
+    def _equations_format(self, context, start):
+        if context is None:
+            head = f"{type(self).__name__}({self.name}): "
+        else:
+            head = f"{self.tag}={type(self).__name__}({self.name}): "
         if start is None:
             dlim = '\n' + len(head) * ' '
-            start = ''
+            start = '  '
         else:
-            head = '- ' + head
             dlim = '\n' + start + len(head) * ' '
             start += '  '
         return head, dlim, start
     
-    def equations(self, fmt=None, context=None, start=None, stack=None):
-        head, dlim, start = self._equations_format(start)
+    def equations(self, fmt=None, context=None, start=None, stack=None, inbound=None):
+        head, dlim, start = self._equations_format(context, start)
+        if stack: context = self.contextualize(context)
         dlim = ('\n' + start)
-        return head + dlim + dlim.join([i.equations(fmt, context + i if stack else context, start) for i in self.nodes])
+        return head + dlim + dlim.join([i.equations(fmt, context, start, stack, inbound) for i in self.nodes])
     
-    def show(self, fmt=None, context=None, start=None, stack=None):
-        return print(self.equations(fmt, context, start, stack))
+    def show(self, fmt=None, context=None, start=None, stack=None, inbound=None):
+        return print(self.equations(fmt, context, start, stack, inbound))
     
     # def equations(self, fmt=None, context=None, dlim=None):
     #     if dlim is None: dlim = '\n'

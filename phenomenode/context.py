@@ -36,14 +36,19 @@ def format_name(line):
 class ContextStack:
     __slots__ = ('stack',)
     
-    def __init__(self, *stack):
+    def __new__(cls, *stack):
+        self = super().__new__(cls)
         self.stack = stack
+        return self
     
     @classmethod
     def from_tuple(cls, tuple):
-        new = cls.__new__(cls)
-        new.stack = tuple
-        return new
+        self = super().__new__(cls)
+        self.stack = tuple
+        return self
+    
+    def __getitem__(self, index):
+        return ContextStack.from_tuple(self.stack[index])
     
     def __iter__(self):
         return iter(self.stack)
@@ -66,6 +71,7 @@ class ContextStack:
             return ContextStack(*self, other)
         else:
             return NotImplemented
+    __iadd__ = __add__
     
     def __radd__(self, other):
         if other is None:
@@ -99,6 +105,15 @@ class ContextFamily:
     def tag(self):
         return self.item.tag
     
+    def __getitem__(self, index):
+        return ContextStack.from_tuple([self][index])
+    
+    def __iter__(self):
+        yield self
+    
+    def __contains__(self, value):
+        return value is self
+    
     def __hash__(self):
         try:
             return self._hash
@@ -121,6 +136,7 @@ class ContextFamily:
             return ContextStack(self, other)
         else:
             return NotImplemented
+    __iadd__ = __add__
     
     def __radd__(self, other):
         if other is None:
@@ -140,7 +156,7 @@ class ContextFamily:
             raise ValueError('invalid context format {fmt!r}')
             
     def __str__(self):
-        return f"{{{', '.join(self.names)}}}" 
+        return f"{{{', '.join([str(i) for i in self.names])}}}" 
     
     def __repr__(self):
         names = ', '.join([repr(i) for i in self.names])
@@ -182,7 +198,10 @@ class ContextItem:
         cls.ticket += 1
         return ticket
     
-    __add__ = ContextFamily.__add__
+    __iter__ = ContextFamily.__iter__
+    __contains__ = ContextFamily.__contains__
+    __getitem__ = ContextFamily.__getitem__
+    __iadd__ = __add__ = ContextFamily.__add__
     __radd__ = ContextFamily.__radd__
     
     def __call__(self, fmt=None):

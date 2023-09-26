@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """
 """
+from . import preferences
+__all__ = preferences.__all__
+from .preferences import *
 
 from .context import *
 from .variable import *
@@ -19,6 +22,7 @@ from . import context
 from . import edge
 
 __all__ = (
+    *__all__,
     'node', 
     'nodes', 
     'edge', 
@@ -26,6 +30,7 @@ __all__ = (
     'context', 
     'variable',
     'registry',
+    'preferences',
     *node.__all__,
     *nodes.__all__,
     *variable.__all__,

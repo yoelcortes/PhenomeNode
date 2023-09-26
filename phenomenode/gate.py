@@ -2,7 +2,7 @@
 """
 """
 from .edge import Edge
-from .context import Inlet, Outlet
+from .context import Inlet, Outlet, ContextStack
 
 __all__ = ('Inlets', 'Outlets')
 
@@ -165,6 +165,10 @@ class Inlets(Gate):
     def __init__(self, sink, size, edges, index):
         self.sink = sink
         super().__init__(size, edges, index)
+        try:
+            assert all([i.sinks[-1] is self.sink for i in self.edges])
+        except:
+            breakpoint()
     
     def framed_variables(self, context, family=False):
         edges = self.edges
@@ -193,15 +197,37 @@ class Outlets(Gate):
     def __init__(self, source, size, edges, index):
         self.source = source
         super().__init__(size, edges, index)
+        assert all([i.sources[-1] is self.source for i in self.edges])
     
-    def framed_variables(self, context, family=False):
+    def framed_variables(self, context, family=False, inbound=None):
+        if inbound is None: inbound = True
         edges = self.edges
         if not edges: return []
         if family:
             variables, = set([i.variables for i in edges]) # All variables must be the same
             return variables.framed(context + Outlet.family([i for i in range(len(edges))]))
+        elif inbound:
+            if context:
+                new_context = context[:-1] # Replace outlet node with inlet node
+            else:
+                new_context = ContextStack()
+            return [
+                i.framed_variables(
+                    new_context + 
+                    sum(i.sinks[:-1], None) +
+                    (sink:=i.sinks[-1]) + 
+                    Inlet(sink.ins.index(i))
+                    if i.sinks else 
+                    context + Outlet(n)
+                )
+                for n, i in enumerate(self.edges)
+            ]
         else:
-            return [i.framed_variables(context + Outlet(n)) for n, i in enumerate(self.edges)]
+            return [
+                i.framed_variables(context + Outlet(n))
+                for n, i in enumerate(self.edges)
+            ]
+            
     
     def _create_edge(self, index):
         return Edge([self.source], None, index)

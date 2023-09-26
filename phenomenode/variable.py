@@ -30,10 +30,16 @@ class Variable:
             return f"{name}{context(fmt)}"
         else:
             return f"{name}[{context(fmt)}]"
-        
+    
+    def __repr__(self):
+        return f"{type(self).__name__}({self.name!r}, {self.context!r})"
+    
+    def __str__(self):
+        return self()
+    
     def framed(self, context=None):
         return Variable(self.name, self.context + context)
-        
+    
     def show(self, fmt=None):
         return print(self(fmt))
     _ipython_display_ = show
@@ -50,6 +56,13 @@ class ActiveVariables(frozenset):
         if context is None: return self
         return ActiveVariables(*[i.framed(context) for i in self])
     
+    def __str__(self):
+        return f"{', '.join([str(i) for i in self])}"
+    
+    def show(self, fmt=None):
+        variables = f"{', '.join([i(fmt) for i in self])}"
+        return print(variables)
+    _ipython_display_ = show
 
 default_chemicals = Chemical.family(['Water'])
 default_phases = Phase.family(['g', 'l'])

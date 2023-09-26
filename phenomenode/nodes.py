@@ -3,6 +3,7 @@
 """
 from .node import Node
 from .variable import ActiveVariables
+from .context import ContextStack
 
 __all__ = ('SurgeTank', 'Bulk', 'Mix', 'Mixer')
 
@@ -10,10 +11,11 @@ class SurgeTank(Node):
     n_ins = 1
     n_outs = 1
     
-    def equations(self, fmt=None, context=None, start=None):
-        head, dlim, start = self._equations_format(start)
+    def equations(self, fmt=None, context=None, start=None, stack=None, inbound=None):
+        head, dlim, start = self._equations_format(context, start)
+        if stack: context = self.contextualize(context)
         inlet, = self.ins.framed_variables(context)
-        outlet, = self.outs.framed_variables(context)
+        outlet, = self.outs.framed_variables(context, inbound)
         return head + dlim.join([f"{i(fmt)} = {j(fmt)}"
                                  for i, j in zip(inlet, outlet)])
 
@@ -28,10 +30,11 @@ class Bulk(Node):
         assert feed.variables == {index.Fcp, index.T, index.P}
         product.variables = ActiveVariables(index.Fc, index.H, index.P)
     
-    def equations(self, fmt=None, context=None, start=None):
-        head, dlim, start = self._equations_format(start)
+    def equations(self, fmt=None, context=None, start=None, stack=None, inbound=None):
+        head, dlim, start = self._equations_format(context, start)
+        if stack: context = self.contextualize(context)
         inlet, = self.ins.framed_variables(context)
-        outlet, = self.outs.framed_variables(context)
+        outlet, = self.outs.framed_variables(context, inbound=inbound)
         F_in = inlet.Fcp(fmt)
         F_out = outlet.Fc(fmt)
         T_in = inlet.T(fmt)
@@ -56,10 +59,11 @@ class Mix(Node):
         for i in self.ins: assert i.variables == bulk_variables
         product.variables = ActiveVariables(index.Fc, index.H, index.P)
     
-    def equations(self, fmt=None, context=None, start=None):
-        head, dlim, start = self._equations_format(start)
+    def equations(self, fmt=None, context=None, start=None, stack=None, inbound=None):
+        head, dlim, start = self._equations_format(context, start)
+        if stack: context = self.contextualize(context)
         ins = self.ins.framed_variables(context, family=True)
-        outlet, = self.outs.framed_variables(context)
+        outlet, = self.outs.framed_variables(context, inbound=inbound)
         F_ins = ins.Fci(fmt)
         F_out = outlet.Fc(fmt)
         H_ins = ins.Hi(fmt)
@@ -79,9 +83,15 @@ class Mixer(Node, tag='mr'):
     
     def load(self):
         self.bulks = []
+        index = self.index
+        spread_variables = {index.Fcp, index.T, index.P}
+        ins = []
         for n, i in enumerate(self.ins):
-            self.bulks.append(
-                Bulk(n, i)
-            )
-        self.mix = Mix(0, ins=[i.outs[0] for i in self.bulks])
+            if i.variables == spread_variables:
+                bulk = Bulk(n, ins=i)
+                self.bulks.append(bulk)
+                ins.append(bulk.outs[0])
+            else:
+                ins.append(i)
+        self.mix = Mix(0, ins=ins, outs=self.outs[0])
         
