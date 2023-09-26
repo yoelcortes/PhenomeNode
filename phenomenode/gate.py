@@ -174,7 +174,7 @@ class Inlets(Gate):
         edges = self.edges
         if not edges: return []
         if family:
-            variables, = set([i.variables for i in edges]) # All variables must be the same
+            variables = next(iter(edges)).variables # All variables must be the same
             return variables.framed(context + Inlet.family([i for i in range(len(edges))]))
         else:
             return [i.framed_variables(context + Inlet(n)) for n, i in enumerate(self.edges)]

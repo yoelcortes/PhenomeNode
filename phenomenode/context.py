@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 """
-
+from .preferences import preferences
 __all__ = ('ContextStack', 'ContextFamily', 'ContextItem',
-           'Inlet', 'Outlet', 'Phase', 'Chemical')
+           'Inlet', 'Outlet', 'Phase', 'Chemical', 'Contexts')
+
+Contexts = []
 
 def format_name(line):
     words = []
@@ -47,6 +49,9 @@ class ContextStack:
         self.stack = tuple
         return self
     
+    def __bool__(self):
+        return bool(self.stack)
+    
     def __getitem__(self, index):
         return ContextStack.from_tuple(self.stack[index])
     
@@ -55,12 +60,6 @@ class ContextStack:
     
     def __contains__(self, value):
         return value in self.stack
-    
-    def __eq__(self, other):
-        return self.stack == other
-    
-    def __hash__(self):
-        return hash(self.stack)
     
     def __add__(self, other):
         if isinstance(other, ContextStack):
@@ -82,7 +81,7 @@ class ContextStack:
             return NotImplemented
     
     def __call__(self, fmt=None):
-        if fmt is None: fmt = 0
+        if fmt is None: fmt = preferences.context_format
         if fmt == -1:
             return ''.join([i(fmt) for i in self])
         else:
@@ -96,7 +95,7 @@ class ContextStack:
 
 
 class ContextFamily:
-    __slots__ = ('names', '_hash')
+    __slots__ = ('names',)
     
     def __init__(self, names):
         self.names = frozenset(names)
@@ -113,19 +112,6 @@ class ContextFamily:
     
     def __contains__(self, value):
         return value is self
-    
-    def __hash__(self):
-        try:
-            return self._hash
-        except:
-            self._hash = hash = (self.__class__, self.names).__hash__()
-            return hash
-    
-    def __eq__(self, other):
-        return (
-            self.__class__ is other.__class__ and
-            self.names == other.names
-        )
     
     def __add__(self, other):
         if isinstance(other, ContextStack):
@@ -145,7 +131,7 @@ class ContextFamily:
             return NotImplemented
     
     def __call__(self, fmt=None):
-        if fmt is None: fmt = 1
+        if fmt is None: fmt = preferences.context_format
         if fmt == -1 or fmt == 0:
             return self.tag
         elif fmt == 1:
@@ -164,7 +150,7 @@ class ContextFamily:
 
 
 class ContextItem:
-    __slots__ = ('name', '_hash')
+    __slots__ = ('name',)
     registered_tags = set()
     priority = 0
     
@@ -186,6 +172,7 @@ class ContextItem:
         cls.registered_tags.add(tag)
         cls.family = type(name + 's', (ContextFamily,), {})
         cls.family.item = cls
+        Contexts.append(cls)
     
     def __new__(cls, name=None):
         self = super().__new__(cls)
@@ -205,7 +192,7 @@ class ContextItem:
     __radd__ = ContextFamily.__radd__
     
     def __call__(self, fmt=None):
-        if fmt is None: fmt = 1
+        if fmt is None: fmt = preferences.context_format
         if fmt == -1:
             return ""
         if fmt == 0 or fmt == 1:
@@ -214,19 +201,6 @@ class ContextItem:
             return f"{self.tag}={self}"
         else:
             raise ValueError(f'invalid context format {fmt!r}')
-    
-    def __hash__(self):
-        try:
-            return self._hash
-        except:
-            self._hash = hash = (self.__class__, self.name).__hash__()
-            return hash
-    
-    def __eq__(self, other):
-        return (
-            self.__class__ is other.__class__ and
-            self.name == other.name
-        )
     
     def __str__(self):
         return f"{type(self).__name__}({self.name})"

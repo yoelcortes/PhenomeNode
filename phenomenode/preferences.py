@@ -43,7 +43,8 @@ class DisplayPreferences:
         'label_edges',
         'node_color', 'node_label_color', 'node_periphery_color',
         'fill_cluster', 'graphviz_format', 'tooltips_full_results',
-        'graphviz_html_height'
+        'context_format',
+        'graphviz_html_height',
     )
     
     def __init__(self):
@@ -90,6 +91,9 @@ class DisplayPreferences:
         
         #: Whether to add full results in tooltips by inserting java script into graphviz html outputs.
         self.tooltips_full_results: bool = False
+        
+        #: Format for context subscripts.
+        self.context_format: int = 0
         
         #: Displayed height of graphviz html diagrams without and with full results.
         self.graphviz_html_height: dict[str, tuple[str, str]] = {

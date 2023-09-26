@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 """
+import phenomenode as phn
 
 __all__ = ('Registry',)
 
@@ -18,12 +19,15 @@ class Registry:
     
     def open_context_level(self):
         contexts = self.contexts
+        tickets = [i.ticket for i in phn.Contexts]
+        for i in phn.Contexts: i.ticket = 0
         self.contexts = []
-        self.context_levels.append(contexts)
+        self.context_levels.append([contexts, tickets])
         
     def close_context_level(self):
         contexts = self.contexts
-        self.contexts = self.context_levels.pop()
+        self.contexts, tickets = self.context_levels.pop()
+        for i, j in zip(phn.Contexts, tickets): i.ticket = j
         return contexts
     
     def __contains__(self, obj):

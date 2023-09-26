@@ -1,15 +1,19 @@
 # -*- coding: utf-8 -*-
 """
 """
+import phenomenode as phn
 from .variable import variable_index
 from .context import ContextItem, ContextStack
 from .gate import Inlets, Outlets
 from .registry import Registry
+from .graphics import box_graphics
+from typing import Optional
 
 __all__ = ('PhenomeNode', 'Node',)
 
 class PhenomeNode(ContextItem, tag='n'):
     __slots__ = ('ins', 'outs', 'nodes', 'index')
+    graphics = box_graphics
     registry = Registry()
     n_ins = 0
     n_outs = 0
@@ -26,6 +30,16 @@ class PhenomeNode(ContextItem, tag='n'):
         self.registry.register(self)
         return self
     
+    def get_tooltip_string(self):
+        equations = self.equations()
+        return equations[equations.index('\n') + 1:]
+    
+    def vizoptions(self):
+        """Return node attributes for graphviz."""
+        options = self.graphics.get_options(self)
+        options['tooltip'] = self.get_tooltip_string()
+        return options
+
     def contextualize(self, context):
         return ContextStack() if context is None else context + self
     
@@ -53,25 +67,94 @@ class PhenomeNode(ContextItem, tag='n'):
     
     def _equations_format(self, context, start):
         if context is None:
-            head = f"{type(self).__name__}({self.name}): "
+            head = f"{type(self).__name__}({self.name}):"
         else:
-            head = f"{self.tag}={type(self).__name__}({self.name}): "
+            head = f"{self.tag}={type(self).__name__}({self.name}):"
         if start is None:
-            dlim = '\n' + len(head) * ' '
+            dlim = '\n'
             start = '  '
         else:
-            dlim = '\n' + start + len(head) * ' '
+            dlim = '\n' + start 
             start += '  '
         return head, dlim, start
     
-    def equations(self, fmt=None, context=None, start=None, stack=None, inbound=None):
+    def equation_list(self, fmt=None, context=None, stack=None, inbound=None):
+        return []
+    
+    def equations(self, fmt=None, context=None, start=None, stack=None, inbound=None, right=None):
         head, dlim, start = self._equations_format(context, start)
         if stack: context = self.contextualize(context)
-        dlim = ('\n' + start)
-        return head + dlim + dlim.join([i.equations(fmt, context, start, stack, inbound) for i in self.nodes])
+        eqlst = self.equation_list(fmt, context, stack, inbound)
+        if right and start != '  ':
+            head = '- ' + head
+        if eqlst:
+            if right:
+                eqdlim = dlim + (len(head) - 1) * ' '
+                head += ' '
+                p = ''
+            else:
+                head += dlim
+                eqdlim = dlim
+                p = '- '
+            eqs = head + eqdlim.join([p + i for i in eqlst]) 
+        else:
+            eqs = head
+        if self.nodes:
+            eqs += dlim + dlim.join([i.equations(fmt, context, start, stack, inbound, right) for i in self.nodes])
+        return eqs
     
-    def show(self, fmt=None, context=None, start=None, stack=None, inbound=None):
-        return print(self.equations(fmt, context, start, stack, inbound))
+    def diagram(self, file: Optional[str]=None, 
+                format: Optional[str]=None,
+                display: Optional[bool]=True,
+                context_format: Optional[int]=None,
+                **graph_attrs):
+        """
+        Display a `Graphviz <https://pypi.org/project/graphviz/>`__ diagram
+        of the node.
+        
+        Parameters
+        ----------
+        file : 
+            Must be one of the following:
+            
+            * [str] File name to save diagram.
+            * [None] Display diagram in console.
+            
+        format : 
+            Format of file.
+        display : 
+            Whether to display diagram in console or to return the graphviz 
+            object.
+        
+        """
+        with phn.preferences.temporary() as pref:
+            if context_format is not None:
+                pref.context_format = context_format
+            f = phn.digraph_from_node(self, title=str(self), **graph_attrs)
+            if display or file:
+                def size(node):
+                    nodes = node.nodes
+                    N = len(nodes)
+                    for n in nodes: N += size(n)
+                    return N
+                N = size(self)
+                if N < 3:
+                    size_key = 'node'
+                elif N < 8:
+                    size_key = 'network'
+                else:
+                    size_key = 'big-network'
+                height = (
+                    phn.preferences.graphviz_html_height
+                    [size_key]
+                    [phn.preferences.tooltips_full_results]
+                )
+                phn.finalize_digraph(f, file, format, height)
+            else:
+                return f
+    
+    def show(self, fmt=None, context=None, start=None, stack=None, inbound=None, right=True):
+        return print(self.equations(fmt, context, start, stack, inbound, right))
     
     # def equations(self, fmt=None, context=None, dlim=None):
     #     if dlim is None: dlim = '\n'

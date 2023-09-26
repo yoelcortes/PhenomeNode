@@ -3,7 +3,7 @@
 """
 from .context import ContextStack, Chemical, Phase
 
-__all__ = ('Variable', 'ActiveVariables', 'variable_index')
+__all__ = ('Variable', 'Variables', 'variable_index')
 
 class Variable:
     __slots__ = ('name', 'context', '_hash')
@@ -11,13 +11,6 @@ class Variable:
     def __init__(self, name, context=None):
         self.name = name
         self.context = ContextStack() if context is None else context
-        
-    def __hash__(self):
-        try:
-            return self._hash
-        except:
-            self._hash = hash = (self.__class__, self.name, self.context).__hash__()
-            return hash
         
     def __eq__(self, other):
         return self.name == other.name and self.context == other.context
@@ -45,7 +38,7 @@ class Variable:
     _ipython_display_ = show
 
 
-class ActiveVariables(frozenset):
+class Variables(tuple):
     
     def __new__(cls, *variables):
         self = super().__new__(cls, variables)
@@ -54,13 +47,13 @@ class ActiveVariables(frozenset):
     
     def framed(self, context=None):
         if context is None: return self
-        return ActiveVariables(*[i.framed(context) for i in self])
+        return Variables(*[i.framed(context) for i in self])
     
     def __str__(self):
-        return f"{', '.join([str(i) for i in self])}"
+        return f"Variables({', '.join([str(i) for i in self])})"
     
     def show(self, fmt=None):
-        variables = f"{', '.join([i(fmt) for i in self])}"
+        variables = f"({', '.join([i(fmt) for i in self])})"
         return print(variables)
     _ipython_display_ = show
 
