@@ -41,7 +41,7 @@ class PhenomeNode(ContextItem, tag='n'):
         return options
 
     def contextualize(self, context):
-        return ContextStack() if context is None else context + self
+        return ContextStack() if context is None else self + context
     
     def load(self): pass
     
@@ -79,14 +79,19 @@ class PhenomeNode(ContextItem, tag='n'):
         return []
     
     def equations(self, fmt=None, context=None, start=None, stack=None, inbound=None, right=None):
+        first = start is None
         head, dlim, start = self._equations_format(context, start)
         if stack: context = self.contextualize(context)
         eqlst = self.equation_list(fmt, context, stack, inbound)
-        if right and start != '  ':
+        if right and not first:
             head = '- ' + head
         if eqlst:
             if right:
-                eqdlim = dlim + (len(head) - 1) * ' '
+                if first:
+                    spaces = (len(head) + 1) * ' '
+                else:
+                    spaces = (len(head) - 1) * ' '
+                eqdlim = dlim + spaces
                 head += ' '
                 p = ''
             else:

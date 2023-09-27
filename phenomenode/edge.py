@@ -3,6 +3,7 @@
 """
 from .variable import Variables, variable_index
 from .context import Outlet, Inlet
+from collections import deque
 
 __all__ = ('Edge',)
 
@@ -12,26 +13,26 @@ class Edge:
     def __init__(self, sources=None, sinks=None, index=None, variables=None):
         if index is None: index = variable_index
         if variables is None: variables = index.equilibrium
-        self.sources = [] if sources is None else sources
-        self.sinks = [] if sinks is None else sinks
+        self.sources = deque() if sources is None else deque(sources)
+        self.sinks = deque() if sinks is None else deque(sinks)
         self.variables = variables
         self.index = index
     
     @property
     def sink(self):
         sinks = self.sinks
-        return sinks[-1] if sinks else None
+        return sinks[0] if sinks else None
     
     @property
     def source(self):
         sources = self.sources
-        return sources[-1] if sources else None
+        return sources[0] if sources else None
     
     def __call__(self, fmt=None, context=None):
         if self.source: 
-            context = context + Outlet(self.source.outs.index(self))
+            context = Outlet(self.source.outs.index(self)) + context
         if self.sink: 
-            context = context + Inlet(self.sink.ins.index(self))
+            context = Inlet(self.sink.ins.index(self)) + context
         return context(fmt)
     
     def get_tooltip_string(self, fmt=None, context=None, dlim=None):

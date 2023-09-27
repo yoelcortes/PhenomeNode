@@ -17,7 +17,7 @@ class Variable:
         
     def __call__(self, fmt=None, context=None):
         name = self.name
-        context = context + self.context
+        context = self.context + context
         if not context: return name
         if fmt == -1:
             return f"{name}{context(fmt)}"

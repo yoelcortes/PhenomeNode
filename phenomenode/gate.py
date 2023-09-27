@@ -165,25 +165,22 @@ class Inlets(Gate):
     def __init__(self, sink, size, edges, index):
         self.sink = sink
         super().__init__(size, edges, index)
-        try:
-            assert all([i.sinks[-1] is self.sink for i in self.edges])
-        except:
-            breakpoint()
     
     def framed_variables(self, context, family=False):
         edges = self.edges
         if not edges: return []
         if family:
-            variables = next(iter(edges)).variables # All variables must be the same
-            return variables.framed(context + Inlet.family([i for i in range(len(edges))]))
+            edge = next(iter(edges)) # All variables must be the same
+            variables = edge.variables
+            return variables.framed(Inlet.family([i for i in range(len(edges))]) + context)
         else:
-            return [i.framed_variables(context + Inlet(n)) for n, i in enumerate(self.edges)]
+            return [i.framed_variables(Inlet(n) + context) for n, i in enumerate(self.edges)]
     
     def _create_edge(self, index):
         return Edge(None, [self.sink], index)
     
     def _dock(self, edge): 
-        edge.sinks.append(self.sink)
+        edge.sinks.appendleft(self.sink)
         return edge
 
     # def _undock(self, edge): 
@@ -197,34 +194,28 @@ class Outlets(Gate):
     def __init__(self, source, size, edges, index):
         self.source = source
         super().__init__(size, edges, index)
-        assert all([i.sources[-1] is self.source for i in self.edges])
     
     def framed_variables(self, context, family=False, inbound=None):
         if inbound is None: inbound = True
         edges = self.edges
         if not edges: return []
         if family:
-            variables, = set([i.variables for i in edges]) # All variables must be the same
-            return variables.framed(context + Outlet.family([i for i in range(len(edges))]))
+            edge = next(iter(edges)) # All variables must be the same
+            variables = edge.variables
+            return variables.framed(Outlet.family([i for i in range(len(edges)) + context]))
         elif inbound:
-            if context:
-                new_context = context[:-1] # Replace outlet node with inlet node
-            else:
-                new_context = ContextStack()
             return [
                 i.framed_variables(
-                    new_context + 
-                    sum(i.sinks[:-1], None) +
-                    (sink:=i.sinks[-1]) + 
-                    Inlet(sink.ins.index(i))
+                    Inlet(i.sinks[0].ins.index(i)) +
+                    sum(i.sinks, None)
                     if i.sinks else 
-                    context + Outlet(n)
+                    Outlet(n) + context
                 )
                 for n, i in enumerate(self.edges)
             ]
         else:
             return [
-                i.framed_variables(context + Outlet(n))
+                i.framed_variables(Outlet(n) + context)
                 for n, i in enumerate(self.edges)
             ]
             
@@ -233,7 +224,7 @@ class Outlets(Gate):
         return Edge([self.source], None, index)
     
     def _dock(self, edge): 
-        edge.sources.append(self.source)
+        edge.sources.appendleft(self.source)
         return edge
     
     # def _undock(self, edge): 

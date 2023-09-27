@@ -13,7 +13,6 @@ class Tank(Node):
     n_outs = 1
     
     def equation_list(self, fmt=None, context=None, stack=None, inbound=None):
-        if stack: context = self.contextualize(context)
         inlet, = self.ins.framed_variables(context)
         outlet, = self.outs.framed_variables(context, inbound)
         return [f"{i(fmt)} = {j(fmt)}" for i, j in zip(inlet, outlet)]
@@ -30,7 +29,6 @@ class Bulk(Node):
         product.variables = index.bulk
     
     def equation_list(self, fmt=None, context=None, stack=None, inbound=None):
-        if stack: context = self.contextualize(context)
         inlet, = self.ins.framed_variables(context)
         outlet, = self.outs.framed_variables(context, inbound=inbound)
         F_in = inlet.Fcp(fmt)
@@ -57,7 +55,6 @@ class Mix(Node):
         product.variables = index.bulk
     
     def equation_list(self, fmt=None, context=None, stack=None, inbound=None):
-        if stack: context = self.contextualize(context)
         ins = self.ins.framed_variables(context, family=True)
         outlet, = self.outs.framed_variables(context, inbound=inbound)
         F_ins = ins.Fci(fmt)
@@ -101,7 +98,6 @@ class Split(Node):
         for i in outs: i.variables = inlet.variables
     
     def equation_list(self, fmt=None, context=None, stack=None, inbound=None):
-        if stack: context = self.contextualize(context)
         inlet, = self.ins.framed_variables(context)
         top, bottom = self.outs.framed_variables(context, inbound=inbound)
         index = self.index

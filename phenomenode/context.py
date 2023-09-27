@@ -67,6 +67,8 @@ class ContextStack:
         elif other is None:
             return self
         elif isinstance(other, (ContextFamily, ContextItem)):
+            if other in self.stack:
+                breakpoint()
             return ContextStack(*self, other)
         else:
             return NotImplemented
@@ -76,6 +78,8 @@ class ContextStack:
         if other is None:
             return self
         elif isinstance(other, (ContextFamily, ContextItem)):
+            if other in self.stack:
+                breakpoint()
             return ContextStack(other, *self)
         else:
             return NotImplemented
@@ -115,10 +119,14 @@ class ContextFamily:
     
     def __add__(self, other):
         if isinstance(other, ContextStack):
+            if self in other.stack:
+                breakpoint()
             return ContextStack(self, *other)
         elif other is None:
             return self
         elif isinstance(other, (ContextFamily, ContextItem)):
+            if other is self:
+                breakpoint()
             return ContextStack(self, other)
         else:
             return NotImplemented
