@@ -4,10 +4,11 @@
 from .node import Node
 from .variable import Variables
 from .context import ContextStack
+from .functions import functions as f
 
-__all__ = ('SurgeTank', 'Bulk', 'Mix', 'Mixer')
+__all__ = ('Tank', 'Bulk', 'Mix', 'Mixer', 'Split')
 
-class SurgeTank(Node):
+class Tank(Node):
     n_ins = 1
     n_outs = 1
     
@@ -25,8 +26,8 @@ class Bulk(Node):
         feed, = self.ins
         product, = self.outs
         index = self.index
-        assert feed.variables == (index.Fcp, index.T, index.P)
-        product.variables = Variables(index.Fc, index.H, index.P)
+        assert feed.variables == index.equilibrium
+        product.variables = index.bulk
     
     def equation_list(self, fmt=None, context=None, stack=None, inbound=None):
         if stack: context = self.contextualize(context)
@@ -39,8 +40,8 @@ class Bulk(Node):
         P_in = inlet.P(fmt)
         P_out = outlet.P(fmt)
         return [
-            f"sum|p {F_in} = {F_out}",
-            f"sum|p Enthalpy({T_in}, {F_in}) = {H_out}",
+            f"{f.sum}p {F_in} = {F_out}",
+            f"{f.sum}p enthalpy({T_in}, {F_in}) = {H_out}",
             f"{P_in} = {P_out}",
         ]
         
@@ -52,9 +53,8 @@ class Mix(Node):
     def load(self):
         product, = self.outs
         index = self.index
-        bulk_variables = (index.Fc, index.H, index.P)
-        for i in self.ins: assert i.variables == bulk_variables
-        product.variables = Variables(index.Fc, index.H, index.P)
+        for i in self.ins: assert i.variables == index.bulk
+        product.variables = index.bulk
     
     def equation_list(self, fmt=None, context=None, stack=None, inbound=None):
         if stack: context = self.contextualize(context)
@@ -67,27 +67,84 @@ class Mix(Node):
         P_ins = ins.Pi(fmt)
         P_out = outlet.P(fmt)
         return [
-            f"sum|i {F_ins} = {F_out}",
-            f"sum|i {H_ins} = {H_out}",
+            f"{f.sum}i {F_ins} = {F_out}",
+            f"{f.sum}i {H_ins} = {H_out}",
             f"min|i {P_ins} = {P_out}",
         ]
     
     
-class Mixer(Node, tag='mr'):
+class Mixer(Node, tag='x'):
     n_ins = 2
     n_outs = 1
     
     def load(self):
         self.bulks = []
-        index = self.index
-        spread_variables = (index.Fcp, index.T, index.P)
+        equilibrium = self.index.equilibrium
         ins = []
-        for n, i in enumerate(self.ins):
-            if i.variables == spread_variables:
-                bulk = Bulk(n, ins=i)
+        for i in self.ins:
+            if i.variables == equilibrium:
+                bulk = Bulk(ins=i)
                 self.bulks.append(bulk)
                 ins.append(bulk.outs[0])
             else:
                 ins.append(i)
-        self.mix = Mix(0, ins=ins, outs=self.outs[0])
-        
+        self.mix = Mix(ins=ins, outs=self.outs[0])
+      
+
+class Split(Node):
+    n_ins = 1
+    n_outs = 2
+    
+    def load(self):
+        inlet, = self.ins
+        outs = self.outs
+        for i in outs: i.variables = inlet.variables
+    
+    def equation_list(self, fmt=None, context=None, stack=None, inbound=None):
+        if stack: context = self.contextualize(context)
+        inlet, = self.ins.framed_variables(context)
+        top, bottom = self.outs.framed_variables(context, inbound=inbound)
+        index = self.index
+        split = index.split
+        vars = self.ins[0].variables
+        if index.Fc in vars:
+            F_in = inlet.Fc(fmt)
+            F_top = top.Fc(fmt)
+            F_bottom = bottom.Fc(fmt)
+            equations = [
+                f"{F_in}{f.x}{split} = {F_top}",
+                f"{F_in}{f.x}(1 - {split}) = {F_bottom}"
+            ]
+        elif index.Fcp in vars:
+            F_in = inlet.Fcp(fmt)
+            F_top = top.Fcp(fmt)
+            F_bottom = bottom.Fcp(fmt)
+            equations = [
+                f"{F_in}{f.x}{split} = {F_top}",
+                f"{F_in}{f.x}(1 - {split}) = {F_bottom}"
+            ]
+        if index.H in vars:
+            H_in = inlet.H(fmt)
+            H_top = top.H(fmt)
+            H_bottom = bottom.H(fmt)
+            equations.extend([
+                f"{H_in}{f.x}{split} = {H_top}",
+                f"{H_in}{f.x}(1 - {split}) = {H_bottom}"
+            ])
+        elif index.T in vars:
+            T_in = inlet.T(fmt)
+            T_top = top.T(fmt)
+            T_bottom = bottom.T(fmt)
+            equations.append(
+                f"{T_in} = {T_top} = {T_bottom}"
+            )
+        if index.P in vars:
+            P_in = inlet.P(fmt)
+            P_top = top.P(fmt)
+            P_bottom = bottom.P(fmt)
+            equations.append(
+                f"{P_in} = {P_top} = {P_bottom}"
+            )
+        return equations
+                
+    

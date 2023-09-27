@@ -61,14 +61,15 @@ default_chemicals = Chemical.family(['Water'])
 default_phases = Phase.family(['g', 'l'])
 
 class VariableIndex:
-    T = Variable('T')
-    P = Variable('P')
-    H = Variable('H')
-    S = Variable('S')
-    G = Variable('G')
-    A = Variable('A')
-    V = Variable('V')
-    F = Variable('F')
+    T = Variable('T') # Temperature
+    P = Variable('P') # Pressure
+    H = Variable('H') # Enthalpy
+    S = Variable('S') # Entropy
+    G = Variable('G') # Gibbs free energy
+    A = Variable('A') # Helmholtz free energy
+    V = Variable('V') # Vapor fraction [by mol]
+    F = Variable('F') # Flow rate [by mol]
+    split = Variable('θ') # Split fraction
     
     def load(self, chemicals=None, phases=None):
         if chemicals is None: chemicals = default_chemicals
@@ -79,6 +80,8 @@ class VariableIndex:
         self.Fc = Variable('F', chemicals)
         self.KVc = Variable('KV', chemicals)
         self.KLc = Variable('KL', chemicals)
+        self.equilibrium = Variables(self.Fcp, self.T, self.P)
+        self.bulk = Variables(self.Fc, self.H, self.P)
 
 variable_index = VariableIndex()
 variable_index.load()

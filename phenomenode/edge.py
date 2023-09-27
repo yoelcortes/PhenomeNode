@@ -11,7 +11,7 @@ class Edge:
         
     def __init__(self, sources=None, sinks=None, index=None, variables=None):
         if index is None: index = variable_index
-        if variables is None: variables = Variables(index.Fcp, index.T, index.P)
+        if variables is None: variables = index.equilibrium
         self.sources = [] if sources is None else sources
         self.sinks = [] if sinks is None else sinks
         self.variables = variables

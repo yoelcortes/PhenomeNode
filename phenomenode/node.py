@@ -18,7 +18,7 @@ class PhenomeNode(ContextItem, tag='n'):
     n_ins = 0
     n_outs = 0
     
-    def __new__(cls, name=None, ins=None, outs=None, index=None):
+    def __new__(cls, ins=None, outs=None, name=None, index=None):
         if index is None: index = variable_index
         self = super().__new__(cls, name)
         self.index = index
@@ -66,10 +66,7 @@ class PhenomeNode(ContextItem, tag='n'):
         if exception: raise exception
     
     def _equations_format(self, context, start):
-        if context is None:
-            head = f"{type(self).__name__}({self.name}):"
-        else:
-            head = f"{self.tag}={type(self).__name__}({self.name}):"
+        head = f"{self}:"
         if start is None:
             dlim = '\n'
             start = '  '

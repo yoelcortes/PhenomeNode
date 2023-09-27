@@ -88,7 +88,7 @@ class ContextStack:
             return ', '.join([i(fmt) for i in self])
     
     def __str__(self):
-        return f"({', '.join([str(i) for i in self])})" 
+        return f"{', '.join([str(i) for i in self])}" 
     
     def __repr__(self):
         return f"{type(self).__name__}{self.stack!r}"
@@ -142,7 +142,7 @@ class ContextFamily:
             raise ValueError('invalid context format {fmt!r}')
             
     def __str__(self):
-        return f"{{{', '.join([str(i) for i in self.names])}}}" 
+        return f"{type(self).__name__} {self()}"
     
     def __repr__(self):
         names = ', '.join([repr(i) for i in self.names])
@@ -163,9 +163,11 @@ class ContextItem:
         cls.ticket = 0
         name = cls.__name__
         if tag is None: 
-            tag = ''.join([i.lower() for i in name if i.isupper()])
+            tag = name[0].lower()
         elif not isinstance(tag, str): 
             raise ValueError('tag must be a string')
+        elif len(tag) != 1:
+            raise ValueError('tag must be a (roman or greek) letter')
         if tag in cls.registered_tags: 
             raise ValueError(f'tag {tag!r} already used')
         cls.tag = tag
@@ -203,7 +205,7 @@ class ContextItem:
             raise ValueError(f'invalid context format {fmt!r}')
     
     def __str__(self):
-        return f"{type(self).__name__}({self.name})"
+        return f"{type(self).__name__}({self()})"
     
     def __repr__(self):
         return f"{type(self).__name__}({self.name!r})" 
