@@ -84,15 +84,12 @@ class ContextStack:
         else:
             return NotImplemented
     
-    def __call__(self, fmt=None):
-        if fmt is None: fmt = preferences.context_format
+    def __str__(self):
+        fmt = preferences.context_format
         if fmt == -1:
             return ''.join([i(fmt) for i in self])
         else:
             return ', '.join([i(fmt) for i in self])
-    
-    def __str__(self):
-        return f"{', '.join([str(i) for i in self])}" 
     
     def __repr__(self):
         return f"{type(self).__name__}{self.stack!r}"
@@ -137,9 +134,9 @@ class ContextFamily:
             return self
         else:
             return NotImplemented
-    
-    def __call__(self, fmt=None):
-        if fmt is None: fmt = preferences.context_format
+      
+    def __str__(self):
+        fmt = preferences.context_format
         if fmt == -1 or fmt == 0:
             return self.tag
         elif fmt == 1:
@@ -148,9 +145,6 @@ class ContextFamily:
             return f"{self.tag} in {self}"
         else:
             raise ValueError('invalid context format {fmt!r}')
-            
-    def __str__(self):
-        return f"{type(self).__name__} {self()}"
     
     def __repr__(self):
         names = ', '.join([repr(i) for i in self.names])
@@ -201,8 +195,8 @@ class ContextItem:
     __iadd__ = __add__ = ContextFamily.__add__
     __radd__ = ContextFamily.__radd__
     
-    def __call__(self, fmt=None):
-        if fmt is None: fmt = preferences.context_format
+    def __str__(self):
+        fmt = preferences.context_format
         if fmt == -1:
             return ""
         if fmt == 0 or fmt == 1:
@@ -211,9 +205,6 @@ class ContextItem:
             return f"{self.tag}={self}"
         else:
             raise ValueError(f'invalid context format {fmt!r}')
-    
-    def __str__(self):
-        return f"{type(self).__name__}({self()})"
     
     def __repr__(self):
         return f"{type(self).__name__}({self.name!r})" 

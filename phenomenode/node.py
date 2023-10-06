@@ -2,11 +2,12 @@
 """
 """
 import phenomenode as phn
-from .variable import variable_index
+from .variable import Variable, variable_index
 from .context import ContextItem, ContextStack
 from .gate import Inlets, Outlets
 from .registry import Registry
 from .graphics import box_graphics
+from .utils import AbstractMethod
 from typing import Optional
 
 __all__ = ('PhenomeNode', 'Node',)
@@ -18,20 +19,38 @@ class PhenomeNode(ContextItem, tag='n'):
     n_ins = 0
     n_outs = 0
     
-    def __new__(cls, ins=None, outs=None, name=None, index=None):
+    def __new__(cls, ins=None, outs=None, name=None, index=None, **kwargs):
         if index is None: index = variable_index
         self = super().__new__(cls, name)
         self.index = index
-        self.ins = Inlets(self, self.n_ins, ins, index)
-        self.outs = Outlets(self, self.n_outs, outs, index)
+        self.prepare()
         self.registry.open_context_level()
         self.load()
         self.nodes = self.registry.close_context_level()
         self.registry.register(self)
         return self
     
+    def prepare(self, ins, outs, **kwargs):
+        """Initialize edges and any additional parameters. 
+        This method is called before `load`"""
+        for i, j in kwargs.items(): setattr(self, i, j)
+        self.init_ins(ins)
+        self.init_outs(outs)
+    
+    def init_ins(self, ins):
+        self.ins = Inlets(self, self.n_ins, ins, self.index)
+        
+    def init_outs(self, outs):
+        self.outs = Outlets(self, self.n_outs, outs, self.index)
+    
+    #: Abstract method for loading subnodes. This method is called after `init`
+    load = AbstractMethod
+    
+    #: Abstract method for generating a list of equations.
+    equations = AbstractMethod
+    
     def get_tooltip_string(self):
-        equations = self.equations()
+        equations = self.describe()
         return equations[equations.index('\n') + 1:]
     
     def vizoptions(self):
@@ -42,8 +61,6 @@ class PhenomeNode(ContextItem, tag='n'):
 
     def contextualize(self, context):
         return ContextStack() if context is None else self + context
-    
-    def load(self): pass
     
     def __enter__(self):
         if self.nodes or self.ins or self.outs:
@@ -66,7 +83,7 @@ class PhenomeNode(ContextItem, tag='n'):
         if exception: raise exception
     
     def _equations_format(self, context, start):
-        head = f"{self}:"
+        head = f"{type(self).__name__}({self}):"
         if start is None:
             dlim = '\n'
             start = '  '
@@ -75,17 +92,27 @@ class PhenomeNode(ContextItem, tag='n'):
             start += '  '
         return head, dlim, start
     
-    def equation_list(self, fmt=None, context=None, stack=None, inbound=None):
-        return []
+    def variable(self, name):
+        return Variable(name, self.context)
     
-    def equations(self, fmt=None, context=None, start=None, stack=None, inbound=None, right=None):
+    def inlet_variables(self, family=None):
+        return self.outs.framed_variables(self.context, family=family)
+    
+    def outlet_variables(self, family=None):
+        return self.outs.framed_variables(self.context, family=None, inbound=self.inbound)
+    
+    def describe(self, context=None, start=None, stack=None, inbound=None, right=None):
         first = start is None
         head, dlim, start = self._equations_format(context, start)
         if stack: context = self.contextualize(context)
-        eqlst = self.equation_list(fmt, context, stack, inbound)
+        self.inbound = inbound
+        self.context = context
+        eqlst = self.equations()
         if right and not first:
             head = '- ' + head
-        if eqlst:
+        if eqlst is NotImplemented:
+            eqs = head
+        else:
             if right:
                 if first:
                     spaces = (len(head) + 1) * ' '
@@ -99,10 +126,8 @@ class PhenomeNode(ContextItem, tag='n'):
                 eqdlim = dlim
                 p = '- '
             eqs = head + eqdlim.join([p + i for i in eqlst]) 
-        else:
-            eqs = head
         if self.nodes:
-            eqs += dlim + dlim.join([i.equations(fmt, context, start, stack, inbound, right) for i in self.nodes])
+            eqs += dlim + dlim.join([i.describe(context, start, stack, inbound, right) for i in self.nodes])
         return eqs
     
     def diagram(self, file: Optional[str]=None, 
@@ -155,19 +180,11 @@ class PhenomeNode(ContextItem, tag='n'):
             else:
                 return f
     
-    def show(self, fmt=None, context=None, start=None, stack=None, inbound=None, right=True):
-        return print(self.equations(fmt, context, start, stack, inbound, right))
+    def show(self, context_format=None, context=None, start=None, stack=None, inbound=None, right=True):
+        with phn.preferences.temporary() as pref:
+            if context_format is not None: pref.context_format = context_format
+            return print(self.describe(context, start, stack, inbound, right))
     
-    # def equations(self, fmt=None, context=None, dlim=None):
-    #     if dlim is None: dlim = '\n'
-    #     return dlim.join([i.equations(fmt, context + i, dlim) for i in self.nodes])
-    
-    # def show(self, fmt=None):
-    #     head = f"{type(self).__name__}({self.name}): "
-    #     dlim = '\n' + len(head) * ' '
-    #     print(
-    #         head + self.equations(fmt, dlim=dlim)
-    #     )
     _ipython_display_ = show
     
 Node = PhenomeNode

@@ -2,39 +2,48 @@
 """
 """
 from .context import ContextStack, Chemical, Phase
+from .quantity import Quantity
+from .preferences import preferences
 
 __all__ = ('Variable', 'Variables', 'variable_index')
 
-class Variable:
+class Variable(Quantity):
     __slots__ = ('name', 'context', '_hash')
     
     def __init__(self, name, context=None):
         self.name = name
         self.context = ContextStack() if context is None else context
         
-    def __eq__(self, other):
-        return self.name == other.name and self.context == other.context
+    def __hash__(self):
+        try:
+            return self._hash
+        except:
+            self._hash = hash(
+                (self.name, self.context)
+            )
+            return self._hash
         
-    def __call__(self, fmt=None, context=None):
-        name = self.name
-        context = self.context + context
-        if not context: return name
-        if fmt == -1:
-            return f"{name}{context(fmt)}"
-        else:
-            return f"{name}[{context(fmt)}]"
-    
+    def __eq__(self, other):
+        return self.__class__ is other.__class__ and self.name == other.name and self.context is other.context
+        
     def __repr__(self):
         return f"{type(self).__name__}({self.name!r}, {self.context!r})"
     
     def __str__(self):
-        return self()
+        fmt = preferences.context_format
+        name = self.name
+        context = self.context
+        if not context: return name
+        if fmt == -1:
+            return f"{name}{context}"
+        else:
+            return f"{name}[{context}]"
     
     def framed(self, context=None):
         return Variable(self.name, self.context + context)
     
-    def show(self, fmt=None):
-        return print(self(fmt))
+    def show(self):
+        return print(self)
     _ipython_display_ = show
 
 
@@ -61,14 +70,16 @@ default_chemicals = Chemical.family(['Water'])
 default_phases = Phase.family(['g', 'l'])
 
 class VariableIndex:
-    T = Variable('T') # Temperature
-    P = Variable('P') # Pressure
-    H = Variable('H') # Enthalpy
-    S = Variable('S') # Entropy
-    G = Variable('G') # Gibbs free energy
-    A = Variable('A') # Helmholtz free energy
+    T = Variable('T') # Temperature [K]
+    P = Variable('P') # Pressure [Pa]
+    H = Variable('H') # Enthalpy [kJ]
+    S = Variable('S') # Entropy [kJ]
+    G = Variable('G') # Gibbs free energy [kJ]
+    A = Variable('A') # Helmholtz free energy [kJ]
     V = Variable('V') # Vapor fraction [by mol]
+    L = Variable('L') # Extract fraction [by mol]
     F = Variable('F') # Flow rate [by mol]
+    Q = Variable('Q') # Duty [kJ]
     split = Variable('θ') # Split fraction
     
     def load(self, chemicals=None, phases=None):
