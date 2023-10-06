@@ -3,8 +3,8 @@
 """
 from .node import Node
 from .variable import Variables, Variable
-from .context import ContextStack
-from .functions import functions as f
+from .function import function_index as f
+from .equality import Equality as EQ
 
 __all__ = ('Tank', 'Bulk', 'Mix', 'Mixer', 'Split')
 
@@ -15,7 +15,7 @@ class Tank(Node):
     def equations(self):
         inlet, = self.inlet_variables()
         outlet, = self.outlet_variables()
-        return [f"{i} = {j}" for i, j in zip(inlet, outlet)]
+        return [EQ(i, j) for i, j in zip(inlet, outlet)]
 
 class Bulk(Node):
     n_ins = 1
@@ -31,10 +31,11 @@ class Bulk(Node):
     def equations(self):
         inlet, = self.inlet_variables()
         outlet, = self.outlet_variables()
+        i = self.index
         return [
-            f"{f.sum}p {inlet.Fcp} = {outlet.Fc}",
-            f"{f.sum}p enthalpy({inlet.Fcp}, {inlet.T}, {inlet.P}) = {outlet.H}",
-            f"{inlet.P} = {outlet.P}",
+            EQ(f.sum[i.phases](inlet.Fcp), outlet.Fc),
+            EQ(f.enthalpy(inlet.Fcp, inlet.T, inlet.P), outlet.H),
+            EQ(inlet.P, outlet.P),
         ]
         
 
@@ -51,16 +52,11 @@ class Mix(Node):
     def equations(self):
         ins = self.inlet_variables(family=True)
         outlet, = self.outlet_variables()
-        F_ins = ins.Fci
-        F_out = outlet.Fc
-        H_ins = ins.Hi
-        H_out = outlet.H
-        P_ins = ins.Pi
-        P_out = outlet.P
+        i = self.index
         return [
-            f"{f.sum}i {F_ins} = {F_out}",
-            f"{f.sum}i {H_ins} = {H_out}",
-            f"min|i {P_ins} = {P_out}",
+            EQ(f.sum[i.inlets](ins.Fci), outlet.Fc),
+            EQ(f.sum(ins.Hi), outlet.H),
+            EQ(f.min(ins.Pi), outlet.P),
         ]
 
     
@@ -98,47 +94,32 @@ class Split(Node):
         split = index.split
         vars = self.ins[0].variables
         if index.Fc in vars:
-            F_in = inlet.Fc
-            F_top = top.Fc
-            F_bottom = bottom.Fc
             equations = [
-                f"{F_in}{f.x}{split} = {F_top}",
-                f"{F_in}{f.x}(1 - {split}) = {F_bottom}"
+                EQ(inlet.Fc * split, top.Fc),
+                EQ(inlet.Fc * (1 - split), bottom.Fc)
             ]
         elif index.Fcp in vars:
-            F_in = inlet.Fcp
-            F_top = top.Fcp
-            F_bottom = bottom.Fcp
             equations = [
-                f"{F_in}{f.x}{split} = {F_top}",
-                f"{F_in}{f.x}(1 - {split}) = {F_bottom}"
+                EQ(inlet.Fcp * split, top.Fcp),
+                EQ(inlet.Fcp * (1 - split), bottom.Fcp)
             ]
         if index.H in vars:
-            H_in = inlet.H
-            H_top = top.H
-            H_bottom = bottom.H
-            equations.extend([
-                f"{H_in}{f.x}{split} = {H_top}",
-                f"{H_in}{f.x}(1 - {split}) = {H_bottom}"
-            ])
+            equations = [
+                EQ(inlet.H * split, top.H),
+                EQ(inlet.H * (1 - split), bottom.H)
+            ]
         elif index.T in vars:
-            T_in = inlet.T
-            T_top = top.T
-            T_bottom = bottom.T
-            equations.append(
-                f"{T_in} = {T_top} = {T_bottom}"
-            )
+            equations = [
+                EQ(inlet.T, top.T, bottom.T)
+            ]
         if index.P in vars:
-            P_in = inlet.P
-            P_top = top.P
-            P_bottom = bottom.P
-            equations.append(
-                f"{P_in} = {P_top} = {P_bottom}"
-            )
+            equations = [
+                EQ(inlet.P, top.P, bottom.P)
+            ]
         return equations
 
 
-class Stage(Node):
+class Stage(Node, tag='χ'):
     n_ins = 1
     n_outs = 2
     
@@ -213,7 +194,7 @@ class LLE(Node):
         return [vle]
 
 
-class Partition(Node):
+class Partition(Node, tag='ξ'):
     n_ins = 1
     n_outs = 2
     

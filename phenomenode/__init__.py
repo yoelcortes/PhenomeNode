@@ -9,6 +9,7 @@ from .variable import *
 from .registry import *
 from .edge import *
 from .gate import *
+from .term import *
 from .node import *
 from .nodes import *
 from .digraph import *
@@ -20,6 +21,7 @@ from . import registry
 from . import gate
 from . import context
 from . import edge
+from . import term
 from . import digraph
 
 __all__ = (
@@ -33,6 +35,7 @@ __all__ = (
     'registry',
     'preferences',
     'digraph',
+    *term.__all__,
     *node.__all__,
     *nodes.__all__,
     *variable.__all__,

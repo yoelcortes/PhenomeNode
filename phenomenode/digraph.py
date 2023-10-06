@@ -140,7 +140,7 @@ def add_connection(f: Digraph, connection, node_names, pen_width=None, **edge_op
                tooltip=tooltip,
                label='')
         inlet_options = sink.graphics.get_inlet_options(sink, sink_index)
-        f.attr('edge', arrowtail='none', arrowhead='none', headlabel=edge(),
+        f.attr('edge', arrowtail='none', arrowhead='none', headlabel=edge.describe(),
                tailport='e', penwidth=penwidth, **inlet_options)
         f.edge(ref, node_names[sink], labeltooltip=tooltip, edgetooltip=tooltip)
     elif has_source and not has_sink:
@@ -155,7 +155,7 @@ def add_connection(f: Digraph, connection, node_names, pen_width=None, **edge_op
                tooltip=tooltip,
                label='')
         outlet_options = source.graphics.get_outlet_options(source, source_index)
-        f.attr('edge', arrowtail='none', arrowhead='none', label=edge(),
+        f.attr('edge', arrowtail='none', arrowhead='none', label=edge.describe(),
                headport='w', penwidth=penwidth, **outlet_options)
         f.edge(node_names[source], ref, labeltooltip=tooltip, edgetooltip=tooltip)
     elif has_sink and has_source:
@@ -164,7 +164,7 @@ def add_connection(f: Digraph, connection, node_names, pen_width=None, **edge_op
         inlet_options = sink.graphics.get_inlet_options(sink, sink_index)
         f.attr('edge', arrowtail='none', arrowhead='normal', 
                **inlet_options, **outlet_options, penwidth=penwidth)
-        label = edge() if preferences.label_edges else ''
+        label = edge.describe() if preferences.label_edges else ''
         f.edge(node_names[source], node_names[sink], label=label,
                labeltooltip=tooltip, edgetooltip=tooltip)
     else:

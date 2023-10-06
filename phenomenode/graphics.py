@@ -39,11 +39,11 @@ class Graphics:
         options = self.node.copy()
         options['label'] = str(node)
         options['name'] = str(hash(node))
-        if 'fillcolor' not in node:
+        if 'fillcolor' not in options:
             options['fillcolor'] = preferences.node_color
-        if 'fontcolor' not in node:
+        if 'fontcolor' not in options:
             options['fontcolor'] = preferences.node_label_color
-        if 'color' not in node:
+        if 'color' not in options:
             options['color'] = preferences.node_periphery_color
         return options
         

@@ -93,7 +93,7 @@ class DisplayPreferences:
         self.tooltips_full_results: bool = False
         
         #: Format for context subscripts.
-        self.context_format: int = 0
+        self.context_format: int = 's'
         
         #: Displayed height of graphviz html diagrams without and with full results.
         self.graphviz_html_height: dict[str, tuple[str, str]] = {

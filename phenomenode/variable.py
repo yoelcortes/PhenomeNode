@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 """
-from .context import ContextStack, Chemical, Phase
+from .context import ContextStack, Chemical, Phase, Inlet, Outlet
 from .quantity import Quantity
 from .preferences import preferences
 
@@ -29,16 +29,19 @@ class Variable(Quantity):
     def __repr__(self):
         return f"{type(self).__name__}({self.name!r}, {self.context!r})"
     
-    def __str__(self):
-        fmt = preferences.context_format
+    def __format__(self, fmt):
+        if fmt == '': fmt = preferences.context_format
         name = self.name
         context = self.context
         if not context: return name
-        if fmt == -1:
-            return f"{name}{context}"
+        if fmt == 's':
+            return f"{name}{context:s}"
         else:
-            return f"{name}[{context}]"
-    
+            return f"{name}[{context:{fmt}}]"
+        
+    def __str__(self):
+        return format(self, preferences.context_format)
+        
     def framed(self, context=None):
         return Variable(self.name, self.context + context)
     
@@ -51,7 +54,7 @@ class Variables(tuple):
     
     def __new__(cls, *variables):
         self = super().__new__(cls, variables)
-        for i in variables: setattr(self, i(-1), i)
+        for i in variables: setattr(self, format(i, 's'), i)
         return self
     
     def framed(self, context=None):
@@ -62,12 +65,9 @@ class Variables(tuple):
         return f"Variables({', '.join([str(i) for i in self])})"
     
     def show(self, fmt=None):
-        variables = f"({', '.join([i(fmt) for i in self])})"
+        variables = f"({', '.join([format(i, fmt) for i in self])})"
         return print(variables)
     _ipython_display_ = show
-
-default_chemicals = Chemical.family(['Water'])
-default_phases = Phase.family(['g', 'l'])
 
 class VariableIndex:
     T = Variable('T') # Temperature [K]
@@ -82,11 +82,11 @@ class VariableIndex:
     Q = Variable('Q') # Duty [kJ]
     split = Variable('θ') # Split fraction
     
-    def load(self, chemicals=None, phases=None):
-        if chemicals is None: chemicals = default_chemicals
-        if phases is None: phases = default_phases
-        self.chemicals = chemicals
-        self.phases = phases
+    def load(self):
+        self.chemicals = chemicals = Chemical.family
+        self.phases = phases = Phase.family
+        self.inlets = Inlet.family
+        self.outlets = Outlet.family
         self.Fcp = Variable('F', ContextStack(chemicals, phases))
         self.Fc = Variable('F', chemicals)
         self.KVc = Variable('KV', chemicals)

@@ -3,9 +3,9 @@
 """
 import phenomenode as phn
 
-__all__ = ('Expression',)
+__all__ = ('Term',)
 
-class Expression:
+class Term:
     __slots__ = ('left', 'right', 'operator')
     order_of_operations = {
         '+': 0,
@@ -22,17 +22,17 @@ class Expression:
         self.operator = '·' if operator == '*' else operator
         
     def variables(self):
-        expressions = {self.left, self.right}
+        terms = {self.left, self.right}
         variables = []
-        while expressions:
-            for i in tuple(expressions):
+        while terms:
+            for i in tuple(terms):
                 if isinstance(i, phn.Variable):
                     variables.append(i)
-                    expressions.remove(i)
+                    terms.remove(i)
                 elif isinstance(i, phn.FunctionCall):
-                    expressions.update(i.parameters)
+                    terms.update(i.parameters)
                 else:
-                    expressions.update([i.left, i.right])
+                    terms.update([i.left, i.right])
         return variables
                 
     def __repr__(self):
@@ -41,10 +41,10 @@ class Expression:
         operator = self.operator
         order = self.order_of_operations
         priority = order[operator]
-        if isinstance(left, Expression):
+        if isinstance(left, Term):
             if priority > order[left.operator]:
                left = f"({left})"
-        if isinstance(right, Expression):
+        if isinstance(right, Term):
             if priority > order[right.operator]:
                right = f"({right})"
         return f"{left} {operator} {right}"

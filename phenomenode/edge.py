@@ -4,6 +4,7 @@
 from .variable import Variables, variable_index
 from .context import Outlet, Inlet
 from collections import deque
+import phenomenode as phn
 
 __all__ = ('Edge',)
 
@@ -28,18 +29,18 @@ class Edge:
         sources = self.sources
         return sources[0] if sources else None
     
-    def __call__(self, fmt=None, context=None):
+    def describe(self, fmt=None, context=None):
         if self.source: 
             context = Outlet(self.source.outs.index(self)) + context
         if self.sink: 
             context = Inlet(self.sink.ins.index(self)) + context
-        return context(fmt)
+        return format(context, 'n')
     
-    def get_tooltip_string(self, fmt=None, context=None, dlim=None):
+    def get_tooltip_string(self, fmt=None, dlim=None):
         if dlim is None: dlim = '\n'
+        if fmt is None: fmt = phn.preferences.context_format
         return dlim.join([
-            variable(fmt, context)
-            for variable in self.variables
+            format(variable, fmt) for variable in self.variables
         ])
     
     def framed_variables(self, context=None):
@@ -49,7 +50,7 @@ class Edge:
         head = f"{type(self).__name__}: "
         dlim = '\n' + len(head) * ' '
         return print(
-            head + self.get_tooltip_string(fmt, dlim=dlim)
+            head + self.get_tooltip_string(fmt, dlim)
         )
     _ipython_display_ = show
 

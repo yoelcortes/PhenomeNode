@@ -172,7 +172,7 @@ class Inlets(Gate):
         if family:
             edge = next(iter(edges)) # All variables must be the same
             variables = edge.variables
-            return variables.framed(Inlet.family([i for i in range(len(edges))]) + context)
+            return variables.framed(Inlet.family + context)
         else:
             return [i.framed_variables(Inlet(n) + context) for n, i in enumerate(self.edges)]
     
@@ -195,14 +195,13 @@ class Outlets(Gate):
         self.source = source
         super().__init__(size, edges, index)
     
-    def framed_variables(self, context, family=False, inbound=None):
-        if inbound is None: inbound = True
+    def framed_variables(self, context, family=False, inbound=False):
         edges = self.edges
         if not edges: return []
         if family:
             edge = next(iter(edges)) # All variables must be the same
             variables = edge.variables
-            return variables.framed(Outlet.family([i for i in range(len(edges)) + context]))
+            return variables.framed(Outlet.family + context)
         elif inbound:
             return [
                 i.framed_variables(

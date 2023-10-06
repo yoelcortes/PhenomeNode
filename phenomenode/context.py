@@ -84,46 +84,29 @@ class ContextStack:
         else:
             return NotImplemented
     
-    def __str__(self):
-        fmt = preferences.context_format
-        if fmt == -1:
-            return ''.join([i(fmt) for i in self])
+    def __format__(self, fmt):
+        if fmt == '': fmt = preferences.context_format
+        if fmt == 's':
+            return ''.join([format(i, fmt) for i in self])
         else:
-            return ', '.join([i(fmt) for i in self])
-    
+            return ', '.join([format(i, fmt) for i in self])
+        
+    def __str__(self):
+        return format(self, preferences.context_format)
+        
     def __repr__(self):
         return f"{type(self).__name__}{self.stack!r}"
 
 
 class ContextFamily:
-    __slots__ = ('names',)
-    
-    def __init__(self, names):
-        self.names = frozenset(names)
-    
-    @property
-    def tag(self):
-        return self.item.tag
-    
-    def __getitem__(self, index):
-        return ContextStack.from_tuple([self][index])
-    
-    def __iter__(self):
-        yield self
-    
-    def __contains__(self, value):
-        return value is self
+    __slots__ = ()
     
     def __add__(self, other):
         if isinstance(other, ContextStack):
-            if self in other.stack:
-                breakpoint()
             return ContextStack(self, *other)
         elif other is None:
             return self
         elif isinstance(other, (ContextFamily, ContextItem)):
-            if other is self:
-                breakpoint()
             return ContextStack(self, other)
         else:
             return NotImplemented
@@ -135,20 +118,21 @@ class ContextFamily:
         else:
             return NotImplemented
       
-    def __str__(self):
-        fmt = preferences.context_format
-        if fmt == -1 or fmt == 0:
+    def __format__(self, fmt):
+        if fmt == '': fmt = preferences.context_format
+        if fmt in ('s', 'n'):
             return self.tag
-        elif fmt == 1:
-            return f"{self.tag} in {format_name(type(self).__name__)}"
-        elif fmt == 2:
-            return f"{self.tag} in {self}"
+        elif fmt == 'f':
+            return f"{format_name(type(self).__name__)}"
         else:
-            raise ValueError('invalid context format {fmt!r}')
+            raise ValueError(f'invalid context format {fmt!r}')
+            
+    def __str__(self):
+        return format(self, preferences.context_format)
+        
     
     def __repr__(self):
-        names = ', '.join([repr(i) for i in self.names])
-        return f"{type(self).__name__}({names})"
+        return f"{type(self).__name__}()"
 
 
 class ContextItem:
@@ -174,8 +158,7 @@ class ContextItem:
             raise ValueError(f'tag {tag!r} already used')
         cls.tag = tag
         cls.registered_tags.add(tag)
-        cls.family = type(name + 's', (ContextFamily,), {})
-        cls.family.item = cls
+        cls.family = type(name + 's', (ContextFamily,), {'tag': tag})()
         Contexts.append(cls)
     
     def __new__(cls, name=None):
@@ -189,22 +172,22 @@ class ContextItem:
         cls.ticket += 1
         return ticket
     
-    __iter__ = ContextFamily.__iter__
-    __contains__ = ContextFamily.__contains__
-    __getitem__ = ContextFamily.__getitem__
     __iadd__ = __add__ = ContextFamily.__add__
     __radd__ = ContextFamily.__radd__
     
-    def __str__(self):
-        fmt = preferences.context_format
-        if fmt == -1:
+    def __format__(self, fmt):
+        if fmt == '': fmt = preferences.context_format
+        if fmt == 's':
             return ""
-        if fmt == 0 or fmt == 1:
+        elif fmt == 'n':
             return f"{self.tag}={self.name}"    
-        elif fmt == 2:
-            return f"{self.tag}={self}"
+        elif fmt == 'f':
+            return f"{self.tag}={str(self)}"
         else:
             raise ValueError(f'invalid context format {fmt!r}')
+            
+    def __str__(self):
+        return f"{type(self).__name__}({self.name})" 
     
     def __repr__(self):
         return f"{type(self).__name__}({self.name!r})" 

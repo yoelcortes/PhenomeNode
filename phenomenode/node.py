@@ -13,7 +13,7 @@ from typing import Optional
 __all__ = ('PhenomeNode', 'Node',)
 
 class PhenomeNode(ContextItem, tag='n'):
-    __slots__ = ('ins', 'outs', 'nodes', 'index')
+    __slots__ = ('ins', 'outs', 'nodes', 'index', 'inbound', 'context')
     graphics = box_graphics
     registry = Registry()
     n_ins = 0
@@ -23,7 +23,7 @@ class PhenomeNode(ContextItem, tag='n'):
         if index is None: index = variable_index
         self = super().__new__(cls, name)
         self.index = index
-        self.prepare()
+        self.prepare(ins, outs, **kwargs)
         self.registry.open_context_level()
         self.load()
         self.nodes = self.registry.close_context_level()
@@ -50,7 +50,7 @@ class PhenomeNode(ContextItem, tag='n'):
     equations = AbstractMethod
     
     def get_tooltip_string(self):
-        equations = self.describe()
+        equations = self.describe().replace('\n- ', '\n')
         return equations[equations.index('\n') + 1:]
     
     def vizoptions(self):
@@ -83,7 +83,7 @@ class PhenomeNode(ContextItem, tag='n'):
         if exception: raise exception
     
     def _equations_format(self, context, start):
-        head = f"{type(self).__name__}({self}):"
+        head = f"{type(self).__name__}({self:n}):"
         if start is None:
             dlim = '\n'
             start = '  '
@@ -96,7 +96,7 @@ class PhenomeNode(ContextItem, tag='n'):
         return Variable(name, self.context)
     
     def inlet_variables(self, family=None):
-        return self.outs.framed_variables(self.context, family=family)
+        return self.ins.framed_variables(self.context, family=family)
     
     def outlet_variables(self, family=None):
         return self.outs.framed_variables(self.context, family=None, inbound=self.inbound)
@@ -125,7 +125,7 @@ class PhenomeNode(ContextItem, tag='n'):
                 head += dlim
                 eqdlim = dlim
                 p = '- '
-            eqs = head + eqdlim.join([p + i for i in eqlst]) 
+            eqs = head + eqdlim.join([p + str(i) for i in eqlst]) 
         if self.nodes:
             eqs += dlim + dlim.join([i.describe(context, start, stack, inbound, right) for i in self.nodes])
         return eqs
