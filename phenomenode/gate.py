@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 """
+from .variable import Variables
 from .edge import Edge
 from .context import Inlet, Outlet, ContextStack
 
@@ -19,11 +20,11 @@ class Gate:
     """
     __slots__ = ('edges',)
         
-    def __init__(self, size, edges=None, index=None):
+    def __init__(self, size, edges=None, index=None, variables=None):
         dock = self._dock
         isa = isinstance
         if edges is None:
-            self.edges = [self._create_edge(index) for i in range(size)]
+            self.edges = [self._create_edge(index, variables) for i in range(size)]
         elif isa(edges, Edge):
             self.edges = [dock(edges)]
         elif hasattr(edges, '__iter__'):
@@ -32,13 +33,19 @@ class Gate:
                 if isa(i, Edge):
                     s = dock(i)
                 elif i is None:
-                    s = self._create_edge(index)
+                    s = self._create_edge(index, variables)
                 else:
                     raise TypeError(f"{i!r} is not an edge")
                 self.edges.append(s)
         
-    def _create_edge(self):
-        return Edge(None, None)
+    @property
+    def variables(self):
+        variables = []
+        for i in self.edges: variables.extend(i.variables)
+        return Variables(*variables)
+        
+    def _create_edge(self, index, variables):
+        return Edge(None, None, index, variables)
         
     def __add__(self, other):
         return self.edges + other
@@ -47,9 +54,7 @@ class Gate:
     
     # DO NOT DELETE: These should be implemented by child class
     # def _dock(self, edge): return edge
-    
-    def _undock(self, edge): 
-        raise RuntimeError('undocking edges breaks node connections')
+    # def _undock(self, edge): pass
 
     def _set_edges(self, slice, edges):
         edges = [self._as_edge(i) for i in edges]
@@ -88,22 +93,16 @@ class Gate:
         self.edges = []
     
     def insert(self, index, edge):
-        if self._fixed_size: 
-            raise RuntimeError(f"size of '{type(self).__name__}' object is fixed")
         self._undock(edge)
         self._dock(edge)
         self.edges.insert(index, edge)
     
     def append(self, edge):
-        if self._fixed_size: 
-            raise RuntimeError(f"size of '{type(self).__name__}' object is fixed")
         self._undock(edge)
         self._dock(edge)
         self.edges.append(edge)
     
     def extend(self, edges):
-        if self._fixed_size: 
-            raise RuntimeError(f"size of '{type(self).__name__}' object is fixed")
         for i in edges:
             self._undock(i)
             self._dock(i)
@@ -118,12 +117,7 @@ class Gate:
 
     def pop(self, index):
         edges = self.edges
-        if self._fixed_size:
-            edge = edges[index]
-            edge = self._create_edge()
-            self.replace(edge, edge)
-        else:
-            edge = edges.pop(index)
+        edge = edges.pop(index)
         return edge
 
     def remove(self, edge):
@@ -162,45 +156,46 @@ class Inlets(Gate):
     """Create an Inlets object which serves as inlet edges for a node."""
     __slots__ = ('sink',)
     
-    def __init__(self, sink, size, edges, index):
+    def __init__(self, sink, size, edges, index, variables):
         self.sink = sink
-        super().__init__(size, edges, index)
+        super().__init__(size, edges, index, variables)
     
     def framed_variables(self, context, family=False):
         edges = self.edges
         if not edges: return []
         if family:
-            edge = next(iter(edges)) # All variables must be the same
-            variables = edge.variables
+            variables = self.variables
             return variables.framed(Inlet.family + context)
         else:
             return [i.framed_variables(Inlet(n) + context) for n, i in enumerate(self.edges)]
     
-    def _create_edge(self, index):
-        return Edge(None, [self.sink], index)
+    def _create_edge(self, index, variables):
+        return Edge(None, [self.sink], index, variables)
     
     def _dock(self, edge): 
         edge.sinks.appendleft(self.sink)
         return edge
 
-    # def _undock(self, edge): 
-    #     edge.sinks.remove(self.sink)
+    def _undock(self, edge): 
+        if self.sink in edge.sinks: 
+            raise RuntimeError('undocking edges breaks node connections')
+            edge.sinks.remove(self.sink)
     
         
 class Outlets(Gate):
     """Create an Outlets object which serves as outlet edges for a node."""
     __slots__ = ('source',)
     
-    def __init__(self, source, size, edges, index):
+    def __init__(self, source, size, edges, index, variables):
         self.source = source
-        super().__init__(size, edges, index)
+        super().__init__(size, edges, index, variables)
     
-    def framed_variables(self, context, family=False, inbound=False):
+    def framed_variables(self, context, family=False, inbound=None):
         edges = self.edges
         if not edges: return []
+        if inbound is None: inbound = True
         if family:
-            edge = next(iter(edges)) # All variables must be the same
-            variables = edge.variables
+            variables = self.variables
             return variables.framed(Outlet.family + context)
         elif inbound:
             return [
@@ -219,13 +214,15 @@ class Outlets(Gate):
             ]
             
     
-    def _create_edge(self, index):
-        return Edge([self.source], None, index)
+    def _create_edge(self, index, variables):
+        return Edge([self.source], None, index, variables)
     
     def _dock(self, edge): 
         edge.sources.appendleft(self.source)
         return edge
     
-    # def _undock(self, edge): 
-    #     edge.sources.remove(self.source)
+    def _undock(self, edge): 
+        if self.sources in edge.sources: 
+            raise RuntimeError('undocking edges breaks node connections')
+            edge.sources.remove(self.source)
         

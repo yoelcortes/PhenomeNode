@@ -11,7 +11,7 @@ class Equality:
         self.terms = terms
 
     def __str__(self):
-        return ' = '.join([str(i) for i in self.terms])
+        return ' = '.join([format(i) for i in self.terms])
 
     def __repr__(self):
         return f"{type(self).__name__}{self.terms!r}"

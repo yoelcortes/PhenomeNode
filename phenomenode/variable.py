@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 """
+from types import MappingProxyType
 from .context import ContextStack, Chemical, Phase, Inlet, Outlet
 from .quantity import Quantity
 from .preferences import preferences
@@ -40,7 +41,7 @@ class Variable(Quantity):
             return f"{name}[{context:{fmt}}]"
         
     def __str__(self):
-        return format(self, preferences.context_format)
+        return format(self, 's')
         
     def framed(self, context=None):
         return Variable(self.name, self.context + context)
@@ -50,12 +51,19 @@ class Variable(Quantity):
     _ipython_display_ = show
 
 
-class Variables(tuple):
+class Variables(frozenset):
     
     def __new__(cls, *variables):
         self = super().__new__(cls, variables)
-        for i in variables: setattr(self, format(i, 's'), i)
+        setattr = super().__setattr__
+        for i in variables: setattr(self, str(i), i)
         return self
+    
+    def dict(self):
+        return MappingProxyType(self.__dict__)
+    
+    def __setattr__(self, name, other):
+        raise AttributeError("variables are immutable")
     
     def framed(self, context=None):
         if context is None: return self

@@ -30,10 +30,10 @@ class Edge:
         return sources[0] if sources else None
     
     def describe(self, fmt=None, context=None):
-        if self.source: 
-            context = Outlet(self.source.outs.index(self)) + context
         if self.sink: 
             context = Inlet(self.sink.ins.index(self)) + context
+        if self.source: 
+            context = Outlet(self.source.outs.index(self)) + context
         return format(context, 'n')
     
     def get_tooltip_string(self, fmt=None, dlim=None):

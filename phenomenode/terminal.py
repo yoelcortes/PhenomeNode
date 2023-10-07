@@ -1,31 +1,44 @@
 # -*- coding: utf-8 -*-
 """
 """
-from .phenomenode import Node
-from .variables import Variables
+from .node import Node
+from .variable import Variable, Variables
+from .equality import Equality as EQ
 
 __all__ = ('Terminal',)
 
 class Terminal(Node):
-    n_ins = 1
     
-    def prepare(self, ins, outs, allocation):
-        self.n_outs = len(allocation)
+    def prepare(self, ins, outs, matches):
+        self.n_ins = max([i[0] for i in matches]) + 1
+        self.n_outs = max([i[1] for i in matches]) + 1
         self.init_ins(ins)
-        self.init_outs(outs)
-        inlet, = self.ins
+        self.init_outs(outs, Variables())
+        self.matches = matches
+        ins = self.ins
         outs = self.outs
-        for i, variables in enumerate(allocation):
-            outlet_variables = []
+        outlet_variables = {i: [] for i in range(self.n_outs)}
+        for i, o, variables in matches:
+            inlet = ins[i]
+            outvars = outlet_variables[o]
             for v in variables:
-                if hasattr(inlet, v):
-                    outlet_variables.append(getattr(inlet, v))
+                if v in inlet.variables:
+                    outvars.append(v)
                 else:
                     raise ValueError(f'inlet has no variable {v}')
-            outs[i].variables = Variables(*outlet_variables)
+        for i, j in outlet_variables.items():
+            outs[i].variables = Variables(*j)
         
     def equations(self):
-        inlet, = self.inlet_variables()
+        ins = self.inlet_variables()
         outs = self.outlet_variables()
-        return [f"{getattr(inlet, str(v))} = {v}" for outlet in outs for v in outlet]
+        eqs = []
+        for i, o, variables in self.matches:
+            inlet = ins[i]
+            outlet = outs[o]
+            for v in variables:
+                eqs.append(
+                    EQ(getattr(inlet, str(v)), getattr(outlet, str(v)))
+                )
+        return eqs
                 

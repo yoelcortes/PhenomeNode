@@ -37,11 +37,11 @@ class PhenomeNode(ContextItem, tag='n'):
         self.init_ins(ins)
         self.init_outs(outs)
     
-    def init_ins(self, ins):
-        self.ins = Inlets(self, self.n_ins, ins, self.index)
+    def init_ins(self, ins, variables=None):
+        self.ins = Inlets(self, self.n_ins, ins, self.index, variables)
         
-    def init_outs(self, outs):
-        self.outs = Outlets(self, self.n_outs, outs, self.index)
+    def init_outs(self, outs, variables=None):
+        self.outs = Outlets(self, self.n_outs, outs, self.index, variables)
     
     #: Abstract method for loading subnodes. This method is called after `init`
     load = AbstractMethod
@@ -50,8 +50,13 @@ class PhenomeNode(ContextItem, tag='n'):
     equations = AbstractMethod
     
     def get_tooltip_string(self):
-        equations = self.describe().replace('\n- ', '\n')
-        return equations[equations.index('\n') + 1:]
+        equations = self.describe()
+        try:
+            index = equations.index('\n')
+        except:
+            return equations
+        else:
+            return equations[index + 1:]
     
     def vizoptions(self):
         """Return node attributes for graphviz."""
@@ -78,8 +83,8 @@ class PhenomeNode(ContextItem, tag='n'):
         products = [i for i in outlets if not i.sinks]   
         self.ins.edges[:] = feeds
         self.outs.edges[:] = products
-        for i in feeds: i.sinks.insert(0, self)
-        for i in products: i.sources.insert(0, self)
+        for i in feeds: i.sinks.append(self)
+        for i in products: i.sources.append(self)
         if exception: raise exception
     
     def _equations_format(self, context, start):
@@ -122,9 +127,14 @@ class PhenomeNode(ContextItem, tag='n'):
                 head += ' '
                 p = ''
             else:
-                head += dlim
-                eqdlim = dlim
-                p = '- '
+                if first:
+                    head += dlim
+                    eqdlim = dlim
+                    p = ''
+                else:
+                    head += dlim[:-2]
+                    eqdlim = dlim[:-2]
+                    p = '- '
             eqs = head + eqdlim.join([p + str(i) for i in eqlst]) 
         if self.nodes:
             eqs += dlim + dlim.join([i.describe(context, start, stack, inbound, right) for i in self.nodes])

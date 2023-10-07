@@ -2,10 +2,11 @@
 """
 """
 import phenomenode as phn
+from .quantity import Quantity
 
 __all__ = ('Term',)
 
-class Term:
+class Term(Quantity):
     __slots__ = ('left', 'right', 'operator')
     order_of_operations = {
         '+': 0,

@@ -85,7 +85,7 @@ class FunctionCall(Quantity):
         if len(parameters) == 1 and isinstance(parameters[0], (FunctionCall, phn.Variable)):
             return f"{self.function} {parameters[0]}"
         else:
-            parameters = ', '.join([str(i) for i in parameters])
+            parameters = ', '.join([format(i) for i in parameters])
             return f"{self.function}({parameters})"
         
     def __repr__(self):

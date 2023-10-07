@@ -1,6 +1,6 @@
 autodisplay: true
 background_color: '#ffffffff'
-context_format: s
+context_format: n
 depth_colors:
 - '#7ac0832f'
 edge_color: '#4e4e4e'

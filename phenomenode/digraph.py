@@ -140,7 +140,7 @@ def add_connection(f: Digraph, connection, node_names, pen_width=None, **edge_op
                tooltip=tooltip,
                label='')
         inlet_options = sink.graphics.get_inlet_options(sink, sink_index)
-        f.attr('edge', arrowtail='none', arrowhead='none', headlabel=edge.describe(),
+        f.attr('edge', arrowtail='none', arrowhead='none', label=edge.describe(),
                tailport='e', penwidth=penwidth, **inlet_options)
         f.edge(ref, node_names[sink], labeltooltip=tooltip, edgetooltip=tooltip)
     elif has_source and not has_sink:

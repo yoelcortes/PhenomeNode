@@ -187,7 +187,7 @@ class ContextItem:
             raise ValueError(f'invalid context format {fmt!r}')
             
     def __str__(self):
-        return f"{type(self).__name__}({self.name})" 
+        return f"{type(self).__name__}({self:n})" 
     
     def __repr__(self):
         return f"{type(self).__name__}({self.name!r})" 
