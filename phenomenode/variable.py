@@ -2,7 +2,7 @@
 """
 """
 from types import MappingProxyType
-from .context import ContextStack, Chemical, Phase, Inlet, Outlet
+from .context import ContextStack, ContextItem, ContextFamily, Chemical, Phase, Inlet, Outlet
 from .quantity import Quantity
 from .preferences import preferences
 
@@ -15,6 +15,28 @@ class Variable(Quantity):
         self.name = name
         self.context = ContextStack() if context is None else context
         
+    def __getitem__(self, index):
+        context = self.context
+        if isinstance(index, ContextItem):
+            tag = index.tag
+            if isinstance(context, ContextFamily):
+                if context.tag == tag: return Variable(self.name, index)
+            elif isinstance(context, ContextStack):
+                new_context = []
+                for i in context:
+                    if isinstance(i, ContextFamily) and i.tag == tag:
+                        new_context.append(index)
+                    else:
+                        new_context.append(i)
+                return Variable(self.name, ContextStack(*new_context))
+            else:
+                raise IndexError(f"{self} has no context family for index {index}")
+        elif isinstance(index, ContextStack):
+            # TODO: Optimize
+            variable = self
+            for i in index: variable = variable[i]
+            return variable
+            
     def __hash__(self):
         try:
             return self._hash
@@ -93,6 +115,9 @@ class VariableIndex:
     def load(self):
         self.chemicals = chemicals = Chemical.family
         self.phases = phases = Phase.family
+        self.liquid = Phase('L')
+        self.solid = Phase('S')
+        self.gas = Phase('G')
         self.inlets = Inlet.family
         self.outlets = Outlet.family
         self.Fcp = Variable('F', ContextStack(chemicals, phases))

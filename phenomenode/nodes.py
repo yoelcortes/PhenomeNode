@@ -49,6 +49,9 @@ class Mix(Node):
                 mixed_variables.append(i)
             else:
                 raise ValueError("'{i}' is not mixable")
+        if 'H' in mixed_variables and 'Q' in mixed_variables:
+            mixed_variables.remove('Q')
+            variables.remove(invars['Q'])
         self.mixed_variables = frozenset(mixed_variables)
         product.variables = Variables(*variables)
         
@@ -153,52 +156,48 @@ class LLEStage(Node, tag='z'):
     def load(self):
         index = self.index
         specs = []
-        matches = [(0, 0, [index.Fc]), (0, 3, [index.Fc])]
-        if self.T:
-            specs.append(index.T)
-            matches.extend([
-                (1, i, [index.T]) for i in range(3)
-            ])
-        if self.P:
-            specs.append(index.P)
-            matches.extend([
-                (1, i, [index.P]) for i in range(3)
-            ])
+        filtered = []
         if self.Q:
             self.ins.append(
                 phn.Edge(variables=Variables(index.Q))
             )
-            matches.append(
-                (0, 0, [index.H])
-            )
         self.mixer = Mixer(self.ins)
+        if self.T:
+            specs.append(index.T)
+            filtered.append(index.H)
+        if self.P:
+            specs.append(index.P)
+            filtered.append(index.P)
         if self.T and self.Q: 
             raise ValueError('cannot specify both temperature and duty')
         elif not (self.T or self.Q):
             raise ValueError('must either temperature or duty')
+        self.filter = Terminal.filter(self.mixer.outs[0], filtered)
+        self.distribute = Terminal.distribute(self.filter.outs[0], [index.Fc], 2)
         specs = Variables(*specs)
         if specs:
             self.ins.append(
                 phn.Edge(variables=specs)
             )
-        self.lle_enter = Terminal([self.mixer.outs[0], self.ins[-1]], matches=matches)
-        self.lle = LLE(self.lle_enter.outs[0])
-        self.lle_exit = Terminal(
-            [self.lle.outs[0], self.lle_enter.outs[3]], 
-            matches=[(0, 0, self.lle.outs[0].variables),
-                     (1, 0, self.lle_enter.outs[3].variables)]
-        )
-        self.partition = Partition(self.lle_exit.outs[0])
-        self.top_exit = Terminal(
-            [self.partition.outs[0], self.lle_enter.outs[1]], 
-            matches=[(0, 0, self.partition.outs[0].variables),
-                     (1, 0, self.lle_enter.outs[1].variables)]
-        )
-        self.bottom_exit = Terminal(
-            [self.partition.outs[1], self.lle_enter.outs[2]], 
-            matches=[(0, 0, self.partition.outs[1].variables),
-                     (1, 0, self.lle_enter.outs[2].variables)]
-        )
+            self.outlet_specs = Terminal.repeat(self.ins[-1], 3)
+            self.merge_specs = Terminal.merge([self.distribute.outs[0], self.outlet_specs.outs[0]])
+            lle_inlet = self.merge_specs.outs[0]
+        else:
+            self.outlet_specs = Terminal.distribute(self.distribute.outs[0], [index.P], 3)
+            lle_inlet = self.distribute.outs[0]
+        self.lle = LLE(lle_inlet)
+        lle_outlet = self.lle.outs[0]
+        merge_T = index.T in lle_outlet.variables
+        if merge_T:
+            self.pop = Terminal.pop(lle_outlet, [index.T], 3)
+            lle_outlet = self.pop.outs[0]
+        self.partition_merge = Terminal.merge([lle_outlet, self.distribute.outs[1]])
+        self.partition = Partition(self.partition_merge.outs[0])
+        if merge_T:
+            self.exit_merges = [Terminal.merge([i, j, k]) for i, j, k 
+                                in zip(self.partition.outs, self.outlet_specs.outs[1:], self.pop.outs[1:])]
+        else:
+            self.exit_merges = [Terminal.merge([i, j]) for i, j in zip(self.partition.outs, self.outlet_specs.outs[1:])]
 
 
 class LLE(Node, tag='l'):
@@ -240,20 +239,21 @@ class Partition(Node, tag='ϕ'):
             self.lle = True
         else:
             raise ValueError('inlet variables must be partition coefficients and a phase fraction')
-        top.variables = bottom.variables = Variables(index.Fc)
+        top.variables = bottom.variables = Variables(index.Fcp)
     
     def equations(self):
         inlet, = self.inlet_variables()
         top, bottom = self.outlet_variables()
+        index = self.index
         if self.vle:
             return [
-                EQ(top.Fc, inlet.Fc * (1 - inlet.V) / (inlet.V * (inlet.KVc - 1) + 1)),
-                EQ(bottom.Fc, inlet.Fc * inlet.V / (inlet.V * (inlet.KVc - 1) + 1))
+                EQ(top.Fcp[index.liquid], inlet.Fc * (1 - inlet.V) / (inlet.V * (inlet.KVc - 1) + 1)),
+                EQ(bottom.Fcp[index.liquid], inlet.Fc * inlet.V / (inlet.V * (inlet.KVc - 1) + 1))
             ]
         elif self.lle:
             return [
-                EQ(top.Fc, inlet.Fc * (1 - inlet.L) / (inlet.L * (inlet.KLc - 1) + 1)),
-                EQ(bottom.Fc, inlet.Fc * inlet.L / (inlet.L * (inlet.KLc - 1) + 1))
+                EQ(top.Fcp[index.liquid], inlet.Fc * (1 - inlet.L) / (inlet.L * (inlet.KLc - 1) + 1)),
+                EQ(bottom.Fcp[index.liquid], inlet.Fc * inlet.L / (inlet.L * (inlet.KLc - 1) + 1))
             ]
         else:
             raise RuntimeError('unknown error')

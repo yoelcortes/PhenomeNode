@@ -182,7 +182,7 @@ class ContextItem:
         elif fmt == 'n':
             return f"{self.tag}={self.name}"    
         elif fmt == 'f':
-            return f"{self.tag}={str(self)}"
+            return str(self)
         else:
             raise ValueError(f'invalid context format {fmt!r}')
             

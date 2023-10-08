@@ -27,24 +27,6 @@ edge_node = dict(
     fontname="Arial",
 )
 
-class PenWidth:
-    __slots__ = ('percentiles',)
-    def __init__(self, edges):
-        values = [len(e.variables) for e in edges] or [0] 
-        try:
-            self.percentiles = np.percentile(
-                values, 
-                [33, 66, 100]
-            )
-        except:
-            self.percentiles = 3 * [max(values)]
-    
-    def __call__(self, edge):
-        value = len(edge.variables)
-        for width, percentile in enumerate(self.percentiles, 1):
-            if value <= percentile: return str(width * 0.6 + 0.4)
-        raise Exception(f'{self.name} beyond maximum')
-
 preferences = phn.preferences
 
 def blank_digraph(format='svg', maxiter='10000000000000000000', 
@@ -119,7 +101,7 @@ def get_all_connections(edges, added_connections=None):
                 added_connections.add(connection)
     return connections
 
-def add_connection(f: Digraph, connection, node_names, pen_width=None, **edge_options):
+def add_connection(f: Digraph, connection, node_names, **edge_options):
     source, source_index, edge, sink_index, sink = connection
     has_source = source in node_names
     has_sink = sink in node_names
@@ -127,7 +109,7 @@ def add_connection(f: Digraph, connection, node_names, pen_width=None, **edge_op
            **edge_options)
     tooltip = edge.get_tooltip_string()
     ref = str(hash(edge))
-    penwidth = pen_width(edge) if pen_width else '1.0'
+    penwidth = '1.0'
     # Make edge nodes / node-edge edges / node-node edges
     if has_sink and not has_source:
         # Feed edge case
@@ -140,7 +122,7 @@ def add_connection(f: Digraph, connection, node_names, pen_width=None, **edge_op
                tooltip=tooltip,
                label='')
         inlet_options = sink.graphics.get_inlet_options(sink, sink_index)
-        f.attr('edge', arrowtail='none', arrowhead='none', label=edge.describe(),
+        f.attr('edge', arrowtail='none', arrowhead='none', label=edge.label(),
                tailport='e', penwidth=penwidth, **inlet_options)
         f.edge(ref, node_names[sink], labeltooltip=tooltip, edgetooltip=tooltip)
     elif has_source and not has_sink:
@@ -155,7 +137,7 @@ def add_connection(f: Digraph, connection, node_names, pen_width=None, **edge_op
                tooltip=tooltip,
                label='')
         outlet_options = source.graphics.get_outlet_options(source, source_index)
-        f.attr('edge', arrowtail='none', arrowhead='none', label=edge.describe(),
+        f.attr('edge', arrowtail='none', arrowhead='none', label=edge.label(),
                headport='w', penwidth=penwidth, **outlet_options)
         f.edge(node_names[source], ref, labeltooltip=tooltip, edgetooltip=tooltip)
     elif has_sink and has_source:
@@ -164,19 +146,13 @@ def add_connection(f: Digraph, connection, node_names, pen_width=None, **edge_op
         inlet_options = sink.graphics.get_inlet_options(sink, sink_index)
         f.attr('edge', arrowtail='none', arrowhead='normal', 
                **inlet_options, **outlet_options, penwidth=penwidth)
-        label = edge.describe() if preferences.label_edges else ''
+        label = edge.label() if preferences.label_edges else ''
         f.edge(node_names[source], node_names[sink], label=label,
                labeltooltip=tooltip, edgetooltip=tooltip)
     else:
         pass
 
 def add_connections(f: Digraph, connections, node_names, color=None, fontcolor=None, **edge_options):
-    variable_width = preferences.variable_width
-    if variable_width:
-        pen_width = PenWidth([i.edge for i in connections])
-    else:
-        pen_width = None
-    
     # Set attributes for graph and edges
     f.attr('graph', overlap='orthoyx', fontname="Arial",
            outputorder='edgesfirst', nodesep='0.5', ranksep='0.15', maxiter='1000000')
@@ -196,7 +172,6 @@ def add_connections(f: Digraph, connections, node_names, color=None, fontcolor=N
         add_connection(f, connection, node_names, 
                        color=color or preferences.edge_color,
                        fontcolor=fontcolor or preferences.label_color,
-                       pen_width=pen_width,
                        **edge_options)
 
 def display_digraph(digraph, format, height=None): # pragma: no coverage

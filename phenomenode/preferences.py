@@ -21,7 +21,6 @@ class DisplayPreferences:
     edge_color: '#90918e'
     label_color: '#90918e'
     depth_colors: ['#f98f609f']
-    variable_width: 'F_mass'
     label_edges: True
     node_color: '#555f69'
     node_label_color: 'white'
@@ -39,7 +38,6 @@ class DisplayPreferences:
         'edge_color',
         'label_color', 
         'depth_colors', 
-        'variable_width',
         'label_edges',
         'node_color', 'node_label_color', 'node_periphery_color',
         'fill_cluster', 'graphviz_format', 'tooltips_full_results',
@@ -70,9 +68,6 @@ class DisplayPreferences:
         
         #: Color of node clusters.
         self.depth_colors: list[str] = ['#f98f609f']
-        
-        #: Whether to scale edge widths by number of variables.
-        self.variable_width: bool = 'F_mass'
         
         #: Node fill color.
         self.node_color: str = '#555f69'
