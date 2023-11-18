@@ -2,13 +2,13 @@
 """
 """
 import numpy as np
-import phenomenode as phn
+import phenomephenomenode as phn
 from .connection import Connection
 from warnings import warn
 from graphviz import Digraph
 from IPython import display
 
-__all__ = ('digraph_from_node',
+__all__ = ('digraph_from_phenomenode',
            'blank_digraph',
            'finalize_digraph',
            'display_digraph',
@@ -40,138 +40,106 @@ def blank_digraph(format='svg', maxiter='10000000000000000000',
            **graph_attrs)
     return f
 
-def digraph_from_node(node, **graph_attrs):
+def digraph_from_phenomenode(phenomenode, **graph_attrs):
     f = blank_digraph(**graph_attrs) 
-    all_edges = set()
-    connected_edges = set()
-    node_names = {}
-    update_node_names(f, node.nodes, node_names)
-    update_digraph_from_path(f, node.nodes, 0, node_names, all_edges, connected_edges)
-    connections = get_all_connections(all_edges.difference(connected_edges))
-    add_connections(f, connections, node_names)
+    all_connections = set()
+    connected = set()
+    phenomenode_names = {}
+    update_phenomenode_names(f, [phenomenode], phenomenode_names)
+    update_digraph_from_path(f, [phenomenode], 0, phenomenode_names, all_connections, connected)
+    add_connections(f, all_connections.difference(connected), phenomenode_names)
     return f
 
-def update_digraph_from_path(f, path, depth, node_names, all_edges, connected_edges):
-    nodes = set()
-    supernodes = []
-    new_edges = set()
+def update_digraph_from_path(f, path, depth, node_names, all_connections, connected):
+    phenomenodes = set()
+    superphenomenodes = []
+    varnodes = set()
+    new_connections = []
+    other_connections = []
     for i in path:
-        if i.nodes:
-            supernodes.append(i)
+        if i.phenomenodes:
+            superphenomenodes.append(i)
         else: 
-            nodes.add(i)
-            new_edges.update(i.ins + i.outs)
-    all_edges.update(new_edges)
-    update_node_names(f, nodes, node_names)
-    edges = [i for i in new_edges if (not i.sink or i.sink in nodes) and (not i.source or i.source in nodes)]
-    connections = get_all_connections(edges)
-    add_connections(f, connections, node_names)
-    connected_edges.update(edges)
+            phenomenodes.add(i)
+            varnodes.update(i.ins + i.outs)
+            for varnode in i.ins:
+                new_connections.append(
+                    Connection(varnode, i)
+                )
+                for source in varnode.sources:
+                    other_connections.append(
+                        Connection(source, varnode)
+                    )
+            for varnode in i.outs:
+                new_connections.append(
+                    Connection(i, varnode)
+                )
+                for sink in varnode.sinks:
+                    other_connections.append(
+                        Connection(varnode, sink)
+                    )
+    all_connections.update(new_connections + other_connections)
+    update_varnode_names(f, varnodes, node_names)
+    update_phenomenode_names(f, phenomenodes, node_names)
+    add_connections(f, new_connections, node_names)
+    connected.update(new_connections)
     depth += 1
     N_colors = len(preferences.depth_colors)
     color = preferences.depth_colors[(depth - 1) % N_colors]
     if preferences.fill_cluster:
-        kwargs = dict(bgcolor=color, penwidth='0.2', color=preferences.edge_color)
+        if depth == 1:
+            kwargs = dict(bgcolor=color, penwidth='0')
+        else:
+            kwargs = dict(bgcolor=color, penwidth='0.2', color=preferences.edge_color)
     else:
         kwargs = dict(color=color, bgcolor='none', penwidth='0.75', style='solid')
-    for i in supernodes:
+    for i in superphenomenodes:
         with f.subgraph(name='cluster_' + str(hash(i))) as c:
             c.attr(label=str(i), fontname="Arial", 
                    labeljust='l', fontcolor=preferences.label_color, 
                    tooltip=i.get_tooltip_string(),
                    **kwargs)
-            update_digraph_from_path(c, i.nodes, depth, node_names, all_edges, connected_edges)
+            update_digraph_from_path(c, i.phenomenodes, depth, node_names, all_connections, connected)
 
 
-def update_node_names(f: Digraph, path, node_names):
+def update_phenomenode_names(f: Digraph, path, node_names):
     for n in path:
-        if n.nodes: continue
+        if n.phenomenodes: continue
         kwargs = n.vizoptions()
         node_names[n] = kwargs['name']
         f.node(**kwargs)
 
-def get_all_connections(edges, added_connections=None):
-    if added_connections is None: added_connections = set()
-    connections = []
-    for e in edges:
-        if (e.sources or e.sinks): 
-            connection = Connection.from_edge(e)
-            if connection and connection not in added_connections:
-                connections.append(connection)
-                added_connections.add(connection)
-    return connections
+def update_varnode_names(f: Digraph, varnodes, node_names):
+    for n in varnodes:
+        if n in node_names: continue
+        kwargs = n.vizoptions()
+        node_names[n] = kwargs['name']
+        f.node(**kwargs)
 
 def add_connection(f: Digraph, connection, node_names, **edge_options):
-    source, source_index, edge, sink_index, sink = connection
-    has_source = source in node_names
-    has_sink = sink in node_names
+    source, sink = connection
     f.attr('edge', label='', taillabel='', headlabel='', labeldistance='2',
            **edge_options)
-    tooltip = edge.get_tooltip_string()
-    ref = str(hash(edge))
-    penwidth = '1.0'
-    # Make edge nodes / node-edge edges / node-node edges
-    if has_sink and not has_source:
-        # Feed edge case
-        f.node(ref,
-               width='0.15', 
-               height='0.15',
-               shape='diamond',
-               fillcolor='#f98f60',
-               color=preferences.edge_color,
-               tooltip=tooltip,
-               label='')
-        inlet_options = sink.graphics.get_inlet_options(sink, sink_index)
-        f.attr('edge', arrowtail='none', arrowhead='none', label=edge.label(),
-               tailport='e', penwidth=penwidth, **inlet_options)
-        f.edge(ref, node_names[sink], labeltooltip=tooltip, edgetooltip=tooltip)
-    elif has_source and not has_sink:
-        # Product edge case
-        f.node(ref, 
-               width='0.15', 
-               height='0.2',
-               shape='triangle',
-               orientation='270',
-               fillcolor='#f98f60',
-               color=preferences.edge_color,
-               tooltip=tooltip,
-               label='')
-        outlet_options = source.graphics.get_outlet_options(source, source_index)
-        f.attr('edge', arrowtail='none', arrowhead='none', label=edge.label(),
-               headport='w', penwidth=penwidth, **outlet_options)
-        f.edge(node_names[source], ref, labeltooltip=tooltip, edgetooltip=tooltip)
-    elif has_sink and has_source:
-        # Process edge case
-        outlet_options = source.graphics.get_outlet_options(source, source_index)
-        inlet_options = sink.graphics.get_inlet_options(sink, sink_index)
-        f.attr('edge', arrowtail='none', arrowhead='normal', 
-               **inlet_options, **outlet_options, penwidth=penwidth)
-        label = edge.label() if preferences.label_edges else ''
-        f.edge(node_names[source], node_names[sink], label=label,
-               labeltooltip=tooltip, edgetooltip=tooltip)
+    for i in connection:
+        if isinstance(i, phn.PhenomeNode):
+            tooltip = i.get_tooltip_string()
+            color = i.graphics.color
+            break
     else:
-        pass
+        raise RuntimeError('connection does not include a phenomenode')
+    penwidth = '1.0'
+    f.edge(node_names[source], node_names[sink], label='', 
+           labeltooltip=tooltip, edgetooltip=tooltip, arrowtail='none', 
+           arrowhead='normal', headport='c', tailport='c', color=color,
+           penwidth=penwidth)
 
-def add_connections(f: Digraph, connections, node_names, color=None, fontcolor=None, **edge_options):
+def add_connections(f: Digraph, connections, node_names, **edge_options):
     # Set attributes for graph and edges
     f.attr('graph', overlap='orthoyx', fontname="Arial",
-           outputorder='edgesfirst', nodesep='0.5', ranksep='0.15', maxiter='1000000')
+           outputorder='edgesfirst', phenomenodesep='0.5', ranksep='0.15', maxiter='1000000')
     f.attr('edge', dir='foward', fontname='Arial')
-    f.attr('node', **edge_node)
-    index = {j: i for i, j in node_names.items()}
-    length = len(index)
-    def key(x):
-        value = index.get(x.source, 0) + index.get(x.sink, length)
-        if x.source_index:
-            value += 1e-3 * x.source_index / len(x.source.outs)
-        if x.sink_index:
-            value += 1e-6 * x.sink_index / len(x.sink.ins)
-        return value
-    connections = sorted(connections, key=key)
     for connection in connections:
         add_connection(f, connection, node_names, 
-                       color=color or preferences.edge_color,
-                       fontcolor=fontcolor or preferences.label_color,
                        **edge_options)
 
 def display_digraph(digraph, format, height=None): # pragma: no coverage

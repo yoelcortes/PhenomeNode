@@ -124,8 +124,6 @@ class VariableIndex:
         self.Fc = Variable('F', chemicals)
         self.KVc = Variable('KV', chemicals)
         self.KLc = Variable('KL', chemicals)
-        self.equilibrium = Variables(self.Fcp, self.T, self.P)
-        self.bulk = Variables(self.Fc, self.H, self.P)
 
 variable_index = VariableIndex()
 variable_index.load()

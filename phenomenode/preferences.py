@@ -139,7 +139,7 @@ class DisplayPreferences:
                        fill_cluster, save)
     
     def dark_mode(self, stream='#98a2ad', label='#e5e5e5', bg='transparent',
-                  cluster=['#5172512f'], node_color='#555f69', 
+                  cluster=['#0000002f', '#5172512f'], node_color='#555f69', 
                   node_label_color='white', node_periphery_color='none',
                   fill_cluster=True, save=False):
         """Set diagram display colors to dark mode."""
@@ -147,7 +147,7 @@ class DisplayPreferences:
                        node_periphery_color, fill_cluster, save)
     
     def light_mode(self, stream='#4e4e4e', label='#4e4e4e', bg='#ffffffff',
-                   cluster=['#7ac0832f'], node_color='white:#CDCDCD', 
+                   cluster=['#ffffff9f', '#7ac0832f'], node_color='white:#CDCDCD', 
                    node_label_color='black', node_periphery_color='#4e4e4e',
                    fill_cluster=True, save=False):
         """Set diagram display colors to light mode."""

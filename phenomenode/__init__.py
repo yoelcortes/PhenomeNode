@@ -7,26 +7,26 @@ from .preferences import *
 from .context import *
 from .variable import *
 from .registry import *
-from .edge import *
+from .varnode import *
 from .gate import *
 from .term import *
-from .node import *
+from .phenomenode import *
 from .nodes import *
 from .digraph import *
 
-from . import node
+from . import phenomenode
 from . import nodes
 from . import variable
 from . import registry
 from . import gate
 from . import context
-from . import edge
+from . import varnode
 from . import term
 from . import digraph
 
 __all__ = (
     *__all__,
-    'node', 
+    'varnode', 
     'nodes', 
     'edge', 
     'gate', 
@@ -36,7 +36,7 @@ __all__ = (
     'preferences',
     'digraph',
     *term.__all__,
-    *node.__all__,
+    *varnode.__all__,
     *nodes.__all__,
     *variable.__all__,
     *gate.__all__,

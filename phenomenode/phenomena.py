@@ -6,7 +6,7 @@ from .node import Node
 from .variable import Variables, Variable
 from .function import function_index as f
 from .equality import Equality as EQ
-from .terminal import Terminal
+from .pylon import Pylon
 
 __all__ = ('Bulk', 'Mix', 'Mixer', 'Split', 'LLEStage', 'Partition', 'LLE')
 
@@ -172,32 +172,32 @@ class LLEStage(Node, tag='z'):
             raise ValueError('cannot specify both temperature and duty')
         elif not (self.T or self.Q):
             raise ValueError('must either temperature or duty')
-        self.filter = Terminal.filter(self.mixer.outs[0], filtered)
-        self.distribute = Terminal.distribute(self.filter.outs[0], [index.Fc], 2)
+        self.filter = Pylon.filter(self.mixer.outs[0], filtered)
+        self.distribute = Pylon.distribute(self.filter.outs[0], [index.Fc], 2)
         specs = Variables(*specs)
         if specs:
             self.ins.append(
                 phn.Edge(variables=specs)
             )
-            self.outlet_specs = Terminal.repeat(self.ins[-1], 3)
-            self.merge_specs = Terminal.merge([self.distribute.outs[0], self.outlet_specs.outs[0]])
+            self.outlet_specs = Pylon.repeat(self.ins[-1], 3)
+            self.merge_specs = Pylon.merge([self.distribute.outs[0], self.outlet_specs.outs[0]])
             lle_inlet = self.merge_specs.outs[0]
         else:
-            self.outlet_specs = Terminal.distribute(self.distribute.outs[0], [index.P], 3)
+            self.outlet_specs = Pylon.distribute(self.distribute.outs[0], [index.P], 3)
             lle_inlet = self.distribute.outs[0]
         self.lle = LLE(lle_inlet)
         lle_outlet = self.lle.outs[0]
         merge_T = index.T in lle_outlet.variables
         if merge_T:
-            self.pop = Terminal.pop(lle_outlet, [index.T], 3)
+            self.pop = Pylon.pop(lle_outlet, [index.T], 3)
             lle_outlet = self.pop.outs[0]
-        self.partition_merge = Terminal.merge([lle_outlet, self.distribute.outs[1]])
+        self.partition_merge = Pylon.merge([lle_outlet, self.distribute.outs[1]])
         self.partition = Partition(self.partition_merge.outs[0])
         if merge_T:
-            self.exit_merges = [Terminal.merge([i, j, k]) for i, j, k 
+            self.exit_merges = [Pylon.merge([i, j, k]) for i, j, k 
                                 in zip(self.partition.outs, self.outlet_specs.outs[1:], self.pop.outs[1:])]
         else:
-            self.exit_merges = [Terminal.merge([i, j]) for i, j in zip(self.partition.outs, self.outlet_specs.outs[1:])]
+            self.exit_merges = [Pylon.merge([i, j]) for i, j in zip(self.partition.outs, self.outlet_specs.outs[1:])]
 
 
 class LLE(Node, tag='l'):

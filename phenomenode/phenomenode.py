@@ -6,15 +6,15 @@ from .variable import Variable, variable_index
 from .context import ContextItem, ContextStack
 from .gate import Inlets, Outlets
 from .registry import Registry
-from .graphics import box_graphics
+from .graphics import material_graphics
 from .utils import AbstractMethod
 from typing import Optional
 
-__all__ = ('PhenomeNode', 'Node',)
+__all__ = ('PhenomeNode',)
 
 class PhenomeNode(ContextItem, tag='n'):
-    __slots__ = ('ins', 'outs', 'nodes', 'index', 'inbound', 'context')
-    graphics = box_graphics
+    __slots__ = ('ins', 'outs', 'phenomena', 'index', 'inbound', 'context')
+    graphics = material_graphics
     registry = Registry()
     n_ins = 0
     n_outs = 0
@@ -26,7 +26,7 @@ class PhenomeNode(ContextItem, tag='n'):
         self.prepare(ins, outs, **kwargs)
         self.registry.open_context_level()
         self.load()
-        self.nodes = self.registry.close_context_level()
+        self.phenomena = self.registry.close_context_level()
         self.registry.register(self)
         return self
     
@@ -37,13 +37,13 @@ class PhenomeNode(ContextItem, tag='n'):
         self.init_ins(ins)
         self.init_outs(outs)
     
-    def init_ins(self, ins, variables=None):
-        self.ins = Inlets(self, self.n_ins, ins, self.index, variables)
+    def init_ins(self, ins):
+        self.ins = Inlets(self, ins)
         
-    def init_outs(self, outs, variables=None):
-        self.outs = Outlets(self, self.n_outs, outs, self.index, variables)
+    def init_outs(self, outs):
+        self.outs = Outlets(self, outs)
     
-    #: Abstract method for loading subnodes. This method is called after `init`
+    #: Abstract method for loading phenomena. This method is called after `init`
     load = AbstractMethod
     
     #: Abstract method for generating a list of equations.
@@ -68,18 +68,18 @@ class PhenomeNode(ContextItem, tag='n'):
         return ContextStack() if context is None else self + context
     
     def __enter__(self):
-        if self.nodes or self.ins or self.outs:
-            raise RuntimeError("only empty nodes can enter `with` statement")
+        if self.phenomena or self.ins or self.outs:
+            raise RuntimeError("only empty phenomena can enter `with` statement")
         self.registry.open_context_level()
         return self
 
     def __exit__(self, type, exception, traceback):
-        if self.nodes or self.ins or self.outs:
+        if self.phenomena or self.ins or self.outs:
             raise RuntimeError('node was modified before exiting `with` statement')
-        self.nodes = nodes = tuple(self.registry.close_context_level())
-        inlets = sum([i.ins for i in nodes], [])
+        self.phenomena = phenomena = tuple(self.registry.close_context_level())
+        inlets = sum([i.ins for i in phenomena], [])
         feeds = [i for i in inlets if not i.sources]
-        outlets = sum([i.outs for i in nodes], [])
+        outlets = sum([i.outs for i in phenomena], [])
         products = [i for i in outlets if not i.sinks]   
         self.ins.edges[:] = feeds
         self.outs.edges[:] = products
@@ -136,8 +136,8 @@ class PhenomeNode(ContextItem, tag='n'):
                     eqdlim = dlim[:-2]
                     p = '- '
             eqs = head + eqdlim.join([p + str(i) for i in eqlst]) 
-        if self.nodes:
-            eqs += dlim + dlim.join([i.describe(context, start, stack, inbound, right) for i in self.nodes])
+        if self.phenomena:
+            eqs += dlim + dlim.join([i.describe(context, start, stack, inbound, right) for i in self.phenomena])
         return eqs
     
     def diagram(self, file: Optional[str]=None, 
@@ -170,9 +170,9 @@ class PhenomeNode(ContextItem, tag='n'):
             f = phn.digraph_from_node(self, title=str(self), **graph_attrs)
             if display or file:
                 def size(node):
-                    nodes = node.nodes
-                    N = len(nodes)
-                    for n in nodes: N += size(n)
+                    phenomena = node.phenomena
+                    N = len(phenomena)
+                    for n in phenomena: N += size(n)
                     return N
                 N = size(self)
                 if N < 3:
@@ -196,5 +196,3 @@ class PhenomeNode(ContextItem, tag='n'):
             return print(self.describe(context, start, stack, inbound, right))
     
     _ipython_display_ = show
-    
-Node = PhenomeNode

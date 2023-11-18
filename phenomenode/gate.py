@@ -1,228 +1,227 @@
 # -*- coding: utf-8 -*-
 """
 """
-from .variable import Variables
-from .edge import Edge
-from .context import Inlet, Outlet, ContextStack
+from .variable import Variable, Variables
+from .node import Node
+from .context import Inlet, Outlet
 
 __all__ = ('Inlets', 'Outlets')
 
 class Gate:
     """
-    Abstract class for a sequence of edges entering or exiting a node.
+    Abstract class for a sequence of varnodes connected to a phenomenode.
     
     Abstract methods:
-        * _dock(self, edge) -> Edge
+        * _dock(self, node) -> Node
         * _undock(self) -> None
-        * _create_edge(self) -> Edge
+        * _create_node(self) -> Node
         * framed_variables(self) -> list[ActiveVariables]
     
     """
-    __slots__ = ('edges',)
+    __slots__ = ('varnodes',)
         
-    def __init__(self, size, edges=None, index=None, variables=None):
+    def __init__(self, varnodes):
         dock = self._dock
         isa = isinstance
-        if edges is None:
-            self.edges = [self._create_edge(index, variables) for i in range(size)]
-        elif isa(edges, Edge):
-            self.edges = [dock(edges)]
-        elif hasattr(edges, '__iter__'):
-            self.edges = []
-            for i in edges:
-                if isa(i, Edge):
+        if isa(varnodes, Node):
+            self.varnodes = [dock(varnodes)]
+        elif isa(varnodes, Variable):
+            self.varnodes = [dock(Node(Variable))]
+        elif hasattr(varnodes, '__iter__'):
+            self.varnodes = []
+            for i in varnodes:
+                if isa(i, Node):
                     s = dock(i)
-                elif i is None:
-                    s = self._create_edge(index, variables)
+                elif isa(i, Variable):
+                    s = dock(Node(i))
                 else:
-                    raise TypeError(f"{i!r} is not an edge")
-                self.edges.append(s)
+                    raise TypeError(f"{i!r} is not an node")
+                self.varnodes.append(s)
         
     @property
     def variables(self):
-        variables = []
-        for i in self.edges: variables.extend(i.variables)
+        variables = [i.variable for i in self.varnodes]
         return Variables(*variables)
         
-    def _create_edge(self, index, variables):
-        return Edge(None, None, index, variables)
+    def _create_node(self, variable):
+        return Node(variable)
         
     def __add__(self, other):
-        return self.edges + other
+        return self.varnodes + other
     def __radd__(self, other):
-        return other + self.edges
+        return other + self.varnodes
     
     # DO NOT DELETE: These should be implemented by child class
-    # def _dock(self, edge): return edge
-    # def _undock(self, edge): pass
+    # def _dock(self, node): return node
+    # def _undock(self, node): pass
 
-    def _set_edges(self, slice, edges):
-        edges = [self._as_edge(i) for i in edges]
-        all_edges = self.edges
-        for edge in all_edges[slice]: self._undock(edge)
-        all_edges[slice] = edges
-        for edge in all_edges: self._dock(edge)
+    def _set_nodes(self, slice, varnodes):
+        varnodes = [self._as_node(i) for i in varnodes]
+        all_nodes = self.varnodes
+        for node in all_nodes[slice]: self._undock(node)
+        all_nodes[slice] = varnodes
+        for node in all_nodes: self._dock(node)
        
-    def _as_edge(self, edge):
-        if edge is None:
-            edge = self._create_edge()
-        elif not isinstance(edge, Edge):
+    def _as_node(self, node):
+        if isinstance(node, Variable):
+            node = self._create_node(node)
+        elif not isinstance(node, Node):
             raise TypeError(
                 f"'{type(self).__name__}' object can only contain "
-                f"'Edge' objects; not '{type(edge).__name__}'"
+                f"'Node' objects; not '{type(node).__name__}'"
             )
-        return edge
+        return node
        
     @property
     def size(self):
-        return self.edges.__len__()
+        return self.varnodes.__len__()
     
     def __len__(self):
-        return self.edges.__len__()
+        return self.varnodes.__len__()
     
     def __bool__(self):
-        return bool(self.edges)
+        return bool(self.varnodes)
     
-    def _set_edge(self, int, edge):
-        edge = self._as_edge(edge)
-        self._undock(self.edges[int])
-        self.edges[int] = self._dock(edge)
+    def _set_node(self, int, node):
+        node = self._as_node(node)
+        self._undock(self.varnodes[int])
+        self.varnodes[int] = self._dock(node)
     
     def empty(self):
-        for i in self.edges: self._undock(i)
-        self.edges = []
+        for i in self.varnodes: self._undock(i)
+        self.varnodes = []
     
-    def insert(self, index, edge):
-        self._undock(edge)
-        self._dock(edge)
-        self.edges.insert(index, edge)
+    def insert(self, index, node):
+        self._undock(node)
+        self._dock(node)
+        self.varnodes.insert(index, node)
     
-    def append(self, edge):
-        self._undock(edge)
-        self._dock(edge)
-        self.edges.append(edge)
+    def append(self, node):
+        self._undock(node)
+        self._dock(node)
+        self.varnodes.append(node)
     
-    def extend(self, edges):
-        for i in edges:
+    def extend(self, varnodes):
+        for i in varnodes:
             self._undock(i)
             self._dock(i)
-            self.edges.append(i)
+            self.varnodes.append(i)
     
-    def replace(self, edge, other_edge):
-        index = self.index(edge)
-        self[index] = other_edge
+    def replace(self, node, other_node):
+        index = self.index(node)
+        self[index] = other_node
 
-    def index(self, edge):
-        return self.edges.index(edge)
+    def index(self, node):
+        return self.varnodes.index(node)
 
     def pop(self, index):
-        edges = self.edges
-        edge = edges.pop(index)
-        return edge
+        varnodes = self.varnodes
+        node = varnodes.pop(index)
+        return node
 
-    def remove(self, edge):
-        self._undock(edge)
-        edge = self._create_edge()
-        self.replace(edge, edge)
+    def remove(self, node):
+        self._undock(node)
+        node = self._create_node()
+        self.replace(node, node)
         
     def clear(self):
-        for i in self.edges: self._undock(i)
-        self.edges.clear()
+        for i in self.varnodes: self._undock(i)
+        self.varnodes.clear()
     
     def reverse(self):
-        self.edges.reverse()
+        self.varnodes.reverse()
     
     def __iter__(self):
-        return iter(self.edges)
+        return iter(self.varnodes)
     
     def __getitem__(self, index):
-        return self.edges[index]
+        return self.varnodes[index]
     
     def __setitem__(self, index, item):
         isa = isinstance
         if isa(index, int):
-            self._set_edge(index, item)
+            self._set_node(index, item)
         elif isa(index, slice):
-            self._set_edges(index, item)
+            self._set_nodes(index, item)
         else:
             raise IndexError("Only intergers and slices are valid "
                              f"indices for '{type(self).__name__}' objects")
     
     def __repr__(self):
-        return repr(self.edges)
+        return repr(self.varnodes)
 
 
 class Inlets(Gate):
-    """Create an Inlets object which serves as inlet edges for a node."""
+    """Create an Inlets object which serves as inlet varnodes for a node."""
     __slots__ = ('sink',)
     
-    def __init__(self, sink, size, edges, index, variables):
+    def __init__(self, sink, varnodes):
         self.sink = sink
-        super().__init__(size, edges, index, variables)
+        super().__init__(varnodes)
     
     def framed_variables(self, context, family=False):
-        edges = self.edges
-        if not edges: return []
+        varnodes = self.varnodes
+        if not varnodes: return []
         if family:
             variables = self.variables
             return variables.framed(Inlet.family + context)
         else:
-            return [i.framed_variables(Inlet(n) + context) for n, i in enumerate(self.edges)]
+            return [i.framed_variable(Inlet(n) + context) for n, i in enumerate(self.varnodes)]
     
-    def _create_edge(self, index, variables):
-        return Edge(None, [self.sink], index, variables)
+    def _create_node(self, variable):
+        return Node(variable, None, [self.sink])
     
-    def _dock(self, edge): 
-        edge.sinks.appendleft(self.sink)
-        return edge
+    def _dock(self, node): 
+        node.sinks.appendleft(self.sink)
+        return node
 
-    def _undock(self, edge): 
-        if self.sink in edge.sinks: 
-            raise RuntimeError('undocking edges breaks node connections')
-            edge.sinks.remove(self.sink)
+    def _undock(self, node): 
+        if self.sink in node.sinks: 
+            raise RuntimeError('undocking varnodes breaks node connections')
+            node.sinks.remove(self.sink)
     
         
 class Outlets(Gate):
-    """Create an Outlets object which serves as outlet edges for a node."""
+    """Create an Outlets object which serves as outlet varnodes for a node."""
     __slots__ = ('source',)
     
-    def __init__(self, source, size, edges, index, variables):
+    def __init__(self, source, varnodes):
         self.source = source
-        super().__init__(size, edges, index, variables)
+        super().__init__(varnodes)
     
     def framed_variables(self, context, family=False, inbound=None):
-        edges = self.edges
-        if not edges: return []
+        varnodes = self.varnodes
+        if not varnodes: return []
         if inbound is None: inbound = True
         if family:
             variables = self.variables
             return variables.framed(Outlet.family + context)
         elif inbound:
             return [
-                i.framed_variables(
-                    Inlet(i.sinks[0].ins.index(i)) +
-                    sum(i.sinks, None)
-                    if i.sinks else 
+                i.framed_variable(
+                    Inlet(sinks[0].ins.index(i)) +
+                    sum(sinks, None)
+                    if (sinks:=[i for i in i.sinks if i.phenomena]) else 
                     Outlet(n) + context
                 )
-                for n, i in enumerate(self.edges)
+                for n, i in enumerate(self.varnodes)
             ]
         else:
             return [
-                i.framed_variables(Outlet(n) + context)
-                for n, i in enumerate(self.edges)
+                i.framed_variable(Outlet(n) + context)
+                for n, i in enumerate(self.varnodes)
             ]
             
     
-    def _create_edge(self, index, variables):
-        return Edge([self.source], None, index, variables)
+    def _create_node(self, variable):
+        return Node(variable, [self.source], None)
     
-    def _dock(self, edge): 
-        edge.sources.appendleft(self.source)
-        return edge
+    def _dock(self, node): 
+        node.sources.appendleft(self.source)
+        return node
     
-    def _undock(self, edge): 
-        if self.sources in edge.sources: 
-            raise RuntimeError('undocking edges breaks node connections')
-            edge.sources.remove(self.source)
+    def _undock(self, node): 
+        if self.sources in node.sources: 
+            raise RuntimeError('undocking varnodes breaks node connections')
+            node.sources.remove(self.source)
         
