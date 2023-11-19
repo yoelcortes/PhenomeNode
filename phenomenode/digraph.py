@@ -61,22 +61,14 @@ def update_digraph_from_path(f, path, depth, node_names, all_connections, connec
             superphenomenodes.append(i)
         else: 
             phenomenodes.add(i)
-            varnodes.update(i.ins + i.outs)
-            for varnode in i.ins:
+            varnodes.update(i.varnodes)
+            for varnode in i.varnodes:
                 new_connections.append(
                     Connection(varnode, i)
                 )
-                for source in varnode.sources:
+                for neighbor in varnode.neighbors:
                     other_connections.append(
-                        Connection(source, varnode)
-                    )
-            for varnode in i.outs:
-                new_connections.append(
-                    Connection(i, varnode)
-                )
-                for sink in varnode.sinks:
-                    other_connections.append(
-                        Connection(varnode, sink)
+                        Connection(neighbor, varnode)
                     )
     all_connections.update(new_connections + other_connections)
     update_varnode_names(f, varnodes, node_names)
@@ -117,18 +109,13 @@ def update_varnode_names(f: Digraph, varnodes, node_names):
         f.node(**kwargs)
 
 def add_connection(f: Digraph, connection, node_names, **edge_options):
-    source, sink = connection
+    phenomenode, varnode = connection
     f.attr('edge', label='', taillabel='', headlabel='', labeldistance='2',
            **edge_options)
-    for i in connection:
-        if isinstance(i, phn.PhenomeNode):
-            tooltip = i.get_tooltip_string()
-            color = i.graphics.color
-            break
-    else:
-        raise RuntimeError('connection does not include a phenomenode')
+    tooltip = phenomenode.get_tooltip_string()
+    color = phenomenode.graphics.color
     penwidth = '1.0'
-    f.edge(node_names[source], node_names[sink], label='', 
+    f.edge(node_names[phenomenode], node_names[varnode], label='', 
            labeltooltip=tooltip, edgetooltip=tooltip, arrowtail='none', 
            arrowhead='normal', headport='c', tailport='c', color=color,
            penwidth=penwidth)

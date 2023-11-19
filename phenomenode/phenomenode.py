@@ -4,20 +4,85 @@
 import phenomenode as phn
 from .variable import Variable, variable_index
 from .context import ContextItem, ContextStack
-from .gate import Inlets, Outlets
+from .gate import Ins, Outs
 from .registry import Registry
 from .graphics import material_graphics
 from .utils import AbstractMethod
-from typing import Optional
+from typing import Optional, Mapping
 
 __all__ = ('PhenomeNode',)
+
+class DefaultSequence:
+    __slots__ = ('sequence', 'default')
+    
+    def __init__(self, sequence=(), default=None):
+        self.sequence = sequence
+        self.default = default
+    
+    def __iter__(self):
+        yield from self.sequence
+        while True: yield self.default
+        
+    def __repr__(self):
+        return f"{type(self).__name__}({self.sequence!r}, {self.default!r})"
+
+
+def default_variables(variables, default_sequence, index):
+    if variables is None: 
+        variables = default_sequence.sequence
+    else:
+        if isinstance(variables, str) or not hasattr(variables, '__iter__'): variables = [variables]
+        new_variables = []
+        for i, d in zip(variables, default_sequence):
+            if i is None and d is not None:
+                new_variables.append(d)
+            elif isinstance(i, str):
+                new_variables.append(getattr(index, str))
+            elif isinstance(i, (phn.Variable, phn.VarNode)):
+                new_variables.append(i)
+            else:
+                raise ValueError('inlets and outlets must be variables or variable nodes')
+        return new_variables
 
 class PhenomeNode(ContextItem, tag='n'):
     __slots__ = ('ins', 'outs', 'phenomena', 'index', 'inbound', 'context')
     graphics = material_graphics
     registry = Registry()
-    n_ins = 0
-    n_outs = 0
+    default_ins = DefaultSequence()
+    default_outs = DefaultSequence()
+    
+    def __init_subclass__(cls, tag=None, priority=None):
+        if priority is None:
+            cls.priority += 1
+        else:
+            cls.priority += priority
+        cls.ticket = 0
+        name = cls.__name__
+        if cls.load:
+            if tag is None:
+                tag = name[0].lower()
+            elif not isinstance(tag, str):
+                raise ValueError('tag must be a string')
+            elif len(tag) != 1:
+                raise ValueError('tag must be a (roman or greek) letter')
+            if tag in cls.registered_tags: 
+                raise ValueError(f'tag {tag!r} already used')
+            cls.tag = tag
+            cls.registered_tags.add(tag)
+        if not isinstance(cls.default_ins, DefaultSequence):
+            if isinstance(cls.default_ins, Mapping):
+                cls.default_ins = DefaultSequence(**cls.default_ins)
+            elif isinstance(cls.default_ins, str):
+                cls.default_ins = DefaultSequence((cls.default_ins,) )
+            elif hasattr(cls.default_ins, '__iter__'):
+                cls.default_ins = DefaultSequence(tuple(cls.default_ins))
+        if not isinstance(cls.default_outs, DefaultSequence):
+            if isinstance(cls.default_outs, Mapping):
+                cls.default_outs = DefaultSequence(**cls.default_outs)
+            elif isinstance(cls.default_outs, str):
+                cls.default_outs = DefaultSequence((cls.default_outs,))
+            elif hasattr(cls.default_outs, '__iter__'):
+                cls.default_outs = DefaultSequence(tuple(cls.default_outs))
     
     def __new__(cls, ins=None, outs=None, name=None, index=None, **kwargs):
         if index is None: index = variable_index
@@ -38,10 +103,18 @@ class PhenomeNode(ContextItem, tag='n'):
         self.init_outs(outs)
     
     def init_ins(self, ins):
-        self.ins = Inlets(self, ins)
+        self.ins = Ins(
+            self, default_variables(ins, self.default_ins, self.index)
+        )
         
     def init_outs(self, outs):
-        self.outs = Outlets(self, outs)
+        self.outs = Outs(
+            self, default_variables(outs, self.default_outs, self.index)
+        )
+    
+    @property
+    def varnodes(self):
+        return self.ins + self.outs
     
     #: Abstract method for loading phenomena. This method is called after `init`
     load = AbstractMethod
@@ -65,7 +138,12 @@ class PhenomeNode(ContextItem, tag='n'):
         return options
 
     def contextualize(self, context):
-        return ContextStack() if context is None else self + context
+        if context is None: # First context is trivial
+            return ContextStack()
+        elif self.phenomena: # Must be a unit operation with internal phenomena
+            return self + context
+        else: # Must be the phenomenon itself, so it does not need context
+            return context
     
     def __enter__(self):
         if self.phenomena or self.ins or self.outs:

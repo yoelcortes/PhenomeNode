@@ -74,15 +74,15 @@ class Variable(Quantity):
 
 
 class Variables(frozenset):
-    
     def __new__(cls, *variables):
         self = super().__new__(cls, variables)
         setattr = super().__setattr__
+        self.variables = variables
         for i in variables: setattr(self, str(i), i)
         return self
     
-    def dict(self):
-        return MappingProxyType(self.__dict__)
+    def __iter__(self):
+        return iter(self.variables)
     
     def __setattr__(self, name, other):
         raise AttributeError("variables are immutable")
@@ -111,19 +111,20 @@ class VariableIndex:
     F = Variable('F') # Flow rate [by mol]
     Q = Variable('Q') # Duty [kJ]
     split = Variable('θ') # Split fraction
+    chemicals = chemicals = Chemical.family
+    phases = phases = Phase.family
+    liquid = Phase('L')
+    solid = Phase('S')
+    gas = Phase('G')
+    inlets = Inlet.family
+    outlets = Outlet.family
+    Fcp = Variable('F', ContextStack(chemicals, phases))
+    Fc = Variable('F', chemicals)
+    FGc = Variable('F', ContextStack(chemicals, gas))
+    FLc = Variable('F', ContextStack(chemicals, liquid))
+    KVc = Variable('KV', ContextStack(chemicals, gas))
+    KLc = Variable('KL', ContextStack(chemicals, liquid))
     
-    def load(self):
-        self.chemicals = chemicals = Chemical.family
-        self.phases = phases = Phase.family
-        self.liquid = Phase('L')
-        self.solid = Phase('S')
-        self.gas = Phase('G')
-        self.inlets = Inlet.family
-        self.outlets = Outlet.family
-        self.Fcp = Variable('F', ContextStack(chemicals, phases))
-        self.Fc = Variable('F', chemicals)
-        self.KVc = Variable('KV', chemicals)
-        self.KLc = Variable('KL', chemicals)
+    def __new__(cls): return cls
 
-variable_index = VariableIndex()
-variable_index.load()
+variable_index = VariableIndex

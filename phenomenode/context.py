@@ -66,10 +66,15 @@ class ContextStack:
             return ContextStack.from_tuple(self.stack + other.stack)
         elif other is None:
             return self
-        elif isinstance(other, (ContextFamily, ContextItem)):
+        elif isinstance(other, context_types):
             if other in self.stack:
                 breakpoint()
             return ContextStack(*self, other)
+        elif isinstance(other, '__iter__'):
+            for i in other:
+                if isinstance(i, context_types): continue
+                raise ValueError('only contexts can be added; not {type(i).__name__} objects')
+            return ContextStack(*self.stack, *other)
         else:
             return NotImplemented
     __iadd__ = __add__
@@ -77,10 +82,13 @@ class ContextStack:
     def __radd__(self, other):
         if other is None:
             return self
-        elif isinstance(other, (ContextFamily, ContextItem)):
-            if other in self.stack:
-                breakpoint()
+        elif isinstance(other, context_types):
             return ContextStack(other, *self)
+        elif isinstance(other, '__iter__'):
+            for i in other:
+                if isinstance(i, context_types): continue
+                raise ValueError('only contexts can be added; not {type(i).__name__} objects')
+            return ContextStack(*self.stack, *other)
         else:
             return NotImplemented
     
@@ -106,7 +114,7 @@ class ContextFamily:
             return ContextStack(self, *other)
         elif other is None:
             return self
-        elif isinstance(other, (ContextFamily, ContextItem)):
+        elif isinstance(other, context_types):
             return ContextStack(self, other)
         else:
             return NotImplemented
@@ -148,9 +156,9 @@ class ContextItem:
             cls.priority += priority
         cls.ticket = 0
         name = cls.__name__
-        if tag is None: 
+        if tag is None:
             tag = name[0].lower()
-        elif not isinstance(tag, str): 
+        elif not isinstance(tag, str):
             raise ValueError('tag must be a string')
         elif len(tag) != 1:
             raise ValueError('tag must be a (roman or greek) letter')
@@ -197,3 +205,5 @@ class Inlet(ContextItem): pass
 class Outlet(ContextItem): pass
 class Phase(ContextItem): pass
 class Chemical(ContextItem): pass
+
+context_types = (ContextFamily, ContextItem)

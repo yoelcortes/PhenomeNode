@@ -26,6 +26,10 @@ class VarNode:
         sources = self.sources
         return sources[0] if sources else None
     
+    @property
+    def neighbors(self):
+        return self.sinks + self.sources
+    
     def label(self):
         return self.get_tooltip_string('s')
     

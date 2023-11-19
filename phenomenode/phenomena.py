@@ -2,94 +2,93 @@
 """
 """
 import phenomenode as phn
-from .node import Node
+from .phenomenode import PhenomeNode
 from .variable import Variables, Variable
 from .function import function_index as f
 from .equality import Equality as EQ
-from .pylon import Pylon
 
-__all__ = ('Bulk', 'Mix', 'Mixer', 'Split', 'LLEStage', 'Partition', 'LLE')
+__all__ = (
+    'BulkEnthalpy', 
+    'BulkMaterial',
+    'Mixer', 
+    'Splitter', 
+    'VLEStage'
+    'LLEStage', 
+    'LLE', 'VLE'
+)
 
-class Bulk(Node):
-    n_ins = 1
-    n_outs = 1
+class BulkEnthalpy(PhenomeNode):
+    default_ins = 'H'
+    default_outs = 'H'
     
     def load(self):
-        feed, = self.ins
+        feeds = self.ins
         product, = self.outs
         index = self.index
-        assert feed.variables == index.equilibrium
-        product.variables = index.bulk
+        for i in [*feeds, product]: assert i.variable == index.H
     
     def equations(self):
-        inlet, = self.inlet_variables()
-        outlet, = self.outlet_variables()
-        i = self.index
-        return [
-            EQ(f.sum[i.phases](inlet.Fcp), outlet.Fc),
-            EQ(f.enthalpy(inlet.Fcp, inlet.T, inlet.P), outlet.H),
-            EQ(inlet.P, outlet.P),
-        ]
-        
+        Hi, = self.inlet_variables(family=True)
+        H, = self.outlet_variables()
+        return [EQ(f.sum[self.index.inlets](Hi), H)]
 
-class Mix(Node):
-    n_ins = 2
-    n_outs = 1
+
+class Enthalpy(PhenomeNode):
+    default_ins = ['Fcp', 'T', 'P']
+    default_outs = 'H'
     
-    def load(self):
-        ins = self.ins
-        product, = self.outs
-        invars = ins.variables.dict()
-        variables = []
-        goodvars = {'Fc', 'H', 'Q', 'P'}
-        mixed_variables = []
-        for i in invars:
-            if i in goodvars:
-                variables.append(invars[i])
-                mixed_variables.append(i)
-            else:
-                raise ValueError("'{i}' is not mixable")
-        if 'H' in mixed_variables and 'Q' in mixed_variables:
-            mixed_variables.remove('Q')
-            variables.remove(invars['Q'])
-        self.mixed_variables = frozenset(mixed_variables)
-        product.variables = Variables(*variables)
-        
     def equations(self):
-        ins = self.inlet_variables(family=True)
-        outlet, = self.outlet_variables()
+        Fcp, T, P = self.inlet_variables()
+        H = self.outlet_variables()
+        return [EQ(f.enthalpy(Fcp, T, P), H)]
+    
+    
+class BulkMaterial(PhenomeNode):
+    default_ins = 'Fcp'
+    default_outs = 'Fc'
+    
+    def equations(self):
+        Fcpi, = self.inlet_variables(family=True)
+        Fc, = self.outlet_variables()
         i = self.index
-        mixed_variables = self.mixed_variables
-        eqs = []
-        if 'Fc' in mixed_variables:
-            eqs.append(
-                EQ(f.sum[i.inlets](ins.Fci), outlet.Fc)
-            )
-        if 'H' in mixed_variables:
-            if 'Q' in mixed_variables:
-                left = f.sum(ins.Hi + ins.Qi)
-            else:
-                left = f.sum(ins.Hi)
-            eqs.append(
-                EQ(left, outlet.H)
-            )
-        elif 'Q' in mixed_variables:
-            eqs.append(
-                EQ(f.sum(ins.Qi), outlet.Q)
-            )
-        if 'P' in mixed_variables:
-            eqs.append(
-                EQ(f.min(ins.Pi), outlet.P)
-            )
-        return eqs
+        return [EQ(f.sum[i.inlets, i.phases](Fcpi), Fc)]
 
+
+class VLE(PhenomeNode):
+    default_ins = ['Fc', 'H', 'P', 'V', 'KV', 'T']
     
-class Mixer(Node, tag='x'):
-    n_ins = 2
-    n_outs = 1
+    def equations(self):
+        return [EQ(f.vle(*self.inlet_variables()), 0)]
     
+
+class LLE(PhenomeNode):
+    default_ins = ['Fc', 'T', 'P', 'L', 'KL', 'H']
+    
+    def equations(self):
+        return [EQ(f.lle(*self.inlet_variables()), 0)]
+    
+    
+class BubblePoint(PhenomeNode):
+    default_ins = ['FLc', 'KV', 'T', 'P']
+    
+    def equations(self):
+        return [EQ(f.bubble_point(*self.inlet_variables()), 0)]
+    
+    
+class DewPoint(PhenomeNode):
+    default_ins = ['FVc', 'KV', 'T', 'P']
+    
+    def equations(self):
+        return [EQ(f.dew_point(*self.inlet_variables()), 0)]
+    
+    
+class Mixer(PhenomeNode, tag='x'):
     def load(self):
-        self.bulks = []
+        
+        self.bulk_material = 
+        self.bulk_enthalpy = 
+        self.enthalpies = enthalpies = []
+        index = self.index
         ins = []
         for i in self.ins:
             if hasattr(i.variables, 'T'):

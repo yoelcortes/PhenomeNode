@@ -5,7 +5,7 @@ from .variable import Variable, Variables
 from .node import Node
 from .context import Inlet, Outlet
 
-__all__ = ('Inlets', 'Outlets')
+__all__ = ('Ins', 'Outs')
 
 class Gate:
     """
@@ -151,8 +151,8 @@ class Gate:
         return repr(self.varnodes)
 
 
-class Inlets(Gate):
-    """Create an Inlets object which serves as inlet varnodes for a node."""
+class Ins(Gate):
+    """Create an Ins object which serves as inlet varnodes for a phenomenode."""
     __slots__ = ('sink',)
     
     def __init__(self, sink, varnodes):
@@ -166,7 +166,7 @@ class Inlets(Gate):
             variables = self.variables
             return variables.framed(Inlet.family + context)
         else:
-            return [i.framed_variable(Inlet(n) + context) for n, i in enumerate(self.varnodes)]
+            return [i.framed_variable(context) for n, i in enumerate(self.varnodes)]
     
     def _create_node(self, variable):
         return Node(variable, None, [self.sink])
@@ -181,8 +181,8 @@ class Inlets(Gate):
             node.sinks.remove(self.sink)
     
         
-class Outlets(Gate):
-    """Create an Outlets object which serves as outlet varnodes for a node."""
+class Outs(Gate):
+    """Create an Outs object which serves as outlet varnodes for a phenomenode."""
     __slots__ = ('source',)
     
     def __init__(self, source, varnodes):
@@ -199,20 +199,18 @@ class Outlets(Gate):
         elif inbound:
             return [
                 i.framed_variable(
-                    Inlet(sinks[0].ins.index(i)) +
                     sum(sinks, None)
                     if (sinks:=[i for i in i.sinks if i.phenomena]) else 
-                    Outlet(n) + context
+                    context
                 )
                 for n, i in enumerate(self.varnodes)
             ]
         else:
             return [
-                i.framed_variable(Outlet(n) + context)
+                i.framed_variable(context)
                 for n, i in enumerate(self.varnodes)
             ]
             
-    
     def _create_node(self, variable):
         return Node(variable, [self.source], None)
     

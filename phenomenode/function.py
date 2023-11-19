@@ -112,4 +112,5 @@ function_index = FunctionIndex(
     vle=Function('vle'),
     lle=Function('lle'),
     enthalpy=Function('enthalpy'),
+    bubble_point=Function('bubble_point'),
 )
