@@ -10,12 +10,16 @@ from .registry import *
 from .varnode import *
 from .gate import *
 from .term import *
+from .unit import *
+from .units import *
 from .phenomenode import *
-from .nodes import *
+from .phenomena import *
 from .digraph import *
 
+from . import unit
+from . import units
 from . import phenomenode
-from . import nodes
+from . import phenomena
 from . import variable
 from . import registry
 from . import gate
@@ -27,21 +31,21 @@ from . import digraph
 __all__ = (
     *__all__,
     'varnode', 
-    'nodes', 
-    'edge', 
+    'phenomena', 
     'gate', 
     'context', 
     'variable',
     'registry',
     'preferences',
     'digraph',
+    *unit.__all__,
+    *units.__all__,
     *term.__all__,
     *varnode.__all__,
-    *nodes.__all__,
+    *phenomena.__all__,
     *variable.__all__,
     *gate.__all__,
     *context.__all__,
-    *edge.__all__,
     *registry.__all__,
     *digraph.__all__,
 )

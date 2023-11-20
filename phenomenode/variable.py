@@ -77,9 +77,12 @@ class Variables(frozenset):
     def __new__(cls, *variables):
         self = super().__new__(cls, variables)
         setattr = super().__setattr__
-        self.variables = variables
+        setattr(self, 'variables', variables)
         for i in variables: setattr(self, str(i), i)
         return self
+    
+    def __getitem__(self, index):
+        return self.variables[index]
     
     def __iter__(self):
         return iter(self.variables)
@@ -120,7 +123,7 @@ class VariableIndex:
     outlets = Outlet.family
     Fcp = Variable('F', ContextStack(chemicals, phases))
     Fc = Variable('F', chemicals)
-    FGc = Variable('F', ContextStack(chemicals, gas))
+    FVc = Variable('F', ContextStack(chemicals, gas))
     FLc = Variable('F', ContextStack(chemicals, liquid))
     KVc = Variable('KV', ContextStack(chemicals, gas))
     KLc = Variable('KL', ContextStack(chemicals, liquid))

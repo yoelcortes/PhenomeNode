@@ -33,29 +33,55 @@ class VarNode:
     def label(self):
         return self.get_tooltip_string('s')
     
-    def get_tooltip_string(self, fmt=None):
-        if fmt is None: fmt = phn.preferences.context_format
+    def vizoptions(self):
+        options = {
+            'shape': 'box',
+            'style': 'filled',
+            'gradientangle': '0',
+            'width': '0.6',
+            'height': '0.6',
+            'orientation': '0.0',
+            'peripheries': '1',
+            'margin': 'default',
+            'fontname': 'Arial'
+        }
+        options['name'] = str(hash(self))
+        if 'label' not in options:
+            options['label'] = str(self)
+        if 'fillcolor' not in options:
+            options['fillcolor'] = phn.preferences.node_color
+        if 'fontcolor' not in options:
+            options['fontcolor'] = phn.preferences.node_label_color
+        if 'color' not in options:
+            options['color'] = phn.preferences.node_periphery_color
+        return options
+    
+    def get_full_context(self):
         sources = [i for i in self.sources if i.phenomena]
         sinks = [i for i in self.sinks if i.phenomena]
-        if sinks:
-            intext = Inlet(sinks[0].ins.index(self)) + sinks
+        variable = self.variable
+        if sources: 
+            n = [i for i in sources[0].outs if i.variable is variable].index(self)
+            outext = Outlet(n) + sources
         else:
-            intext = None
-            if sources: 
-                outext = Outlet(sources[0].outs.index(self)) + sources
+            outext = None
+            if sinks:
+                n = [i for i in sinks[0].ins if i.variable is variable].index(self)
+                intext = Inlet(n) + sinks
             else:
-                outext = phn.ContextStack()
+                intext = None
+        return outext or intext
+    
+    def get_tooltip_string(self, fmt=None):
+        if fmt is None: fmt = phn.preferences.context_format
         label = format(
-            self.framed_variable(
-                context=intext or outext
+            self.variable.framed(
+                context=self.get_full_context()
             ),
             fmt
         )
         if len(label) > 15: label = label[:12] + '...'
         return label
-    
-    def framed_variable(self, context=None):
-        return self.variable.framed(context)
     
     __str__ = label
     

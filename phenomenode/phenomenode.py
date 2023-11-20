@@ -27,9 +27,9 @@ class DefaultSequence:
         return f"{type(self).__name__}({self.sequence!r}, {self.default!r})"
 
 
-def default_variables(variables, default_sequence, index):
+def default_variables(variables, default_sequence):
     if variables is None: 
-        variables = default_sequence.sequence
+        return default_sequence.sequence
     else:
         if isinstance(variables, str) or not hasattr(variables, '__iter__'): variables = [variables]
         new_variables = []
@@ -37,7 +37,7 @@ def default_variables(variables, default_sequence, index):
             if i is None and d is not None:
                 new_variables.append(d)
             elif isinstance(i, str):
-                new_variables.append(getattr(index, str))
+                new_variables.append(getattr(variable_index, str))
             elif isinstance(i, (phn.Variable, phn.VarNode)):
                 new_variables.append(i)
             else:
@@ -45,7 +45,7 @@ def default_variables(variables, default_sequence, index):
         return new_variables
 
 class PhenomeNode(ContextItem, tag='n'):
-    __slots__ = ('ins', 'outs', 'phenomena', 'index', 'inbound', 'context')
+    __slots__ = ('ins', 'outs', 'phenomena', 'inbound', 'context')
     graphics = material_graphics
     registry = Registry()
     default_ins = DefaultSequence()
@@ -73,26 +73,36 @@ class PhenomeNode(ContextItem, tag='n'):
             if isinstance(cls.default_ins, Mapping):
                 cls.default_ins = DefaultSequence(**cls.default_ins)
             elif isinstance(cls.default_ins, str):
-                cls.default_ins = DefaultSequence((cls.default_ins,) )
+                cls.default_ins = DefaultSequence((getattr(variable_index, cls.default_ins),) )
             elif hasattr(cls.default_ins, '__iter__'):
-                cls.default_ins = DefaultSequence(tuple(cls.default_ins))
+                cls.default_ins = DefaultSequence(
+                    tuple([
+                        getattr(variable_index, i) if isinstance(i, str) else i 
+                        for i in cls.default_ins
+                    ])
+                )
         if not isinstance(cls.default_outs, DefaultSequence):
             if isinstance(cls.default_outs, Mapping):
                 cls.default_outs = DefaultSequence(**cls.default_outs)
             elif isinstance(cls.default_outs, str):
-                cls.default_outs = DefaultSequence((cls.default_outs,))
+                cls.default_outs = DefaultSequence((getattr(variable_index, cls.default_outs),) )
             elif hasattr(cls.default_outs, '__iter__'):
-                cls.default_outs = DefaultSequence(tuple(cls.default_outs))
+                cls.default_outs = DefaultSequence(
+                    tuple([
+                        getattr(variable_index, i) if isinstance(i, str) else i 
+                        for i in cls.default_outs
+                    ])
+                )
     
-    def __new__(cls, ins=None, outs=None, name=None, index=None, **kwargs):
-        if index is None: index = variable_index
+    def __new__(cls, ins=None, outs=None, name=None, **kwargs):
         self = super().__new__(cls, name)
-        self.index = index
         self.prepare(ins, outs, **kwargs)
         self.registry.open_context_level()
         self.load()
         self.phenomena = self.registry.close_context_level()
+        for i in self.phenomena: i.ancestry.append(i)
         self.registry.register(self)
+        self.ancestry = [self]
         return self
     
     def prepare(self, ins, outs, **kwargs):
@@ -104,12 +114,12 @@ class PhenomeNode(ContextItem, tag='n'):
     
     def init_ins(self, ins):
         self.ins = Ins(
-            self, default_variables(ins, self.default_ins, self.index)
+            self, default_variables(ins, self.default_ins)
         )
         
     def init_outs(self, outs):
         self.outs = Outs(
-            self, default_variables(outs, self.default_outs, self.index)
+            self, default_variables(outs, self.default_outs)
         )
     
     @property
@@ -140,7 +150,8 @@ class PhenomeNode(ContextItem, tag='n'):
     def contextualize(self, context):
         if context is None: # First context is trivial
             return ContextStack()
-        elif self.phenomena: # Must be a unit operation with internal phenomena
+        elif self.phenomena and not (isinstance(context, ContextStack) and self in context.stack):
+            # Must be a unit operation with internal phenomena
             return self + context
         else: # Must be the phenomenon itself, so it does not need context
             return context
@@ -165,7 +176,7 @@ class PhenomeNode(ContextItem, tag='n'):
         for i in products: i.sources.append(self)
         if exception: raise exception
     
-    def _equations_format(self, context, start):
+    def _equations_format(self, start):
         head = f"{type(self).__name__}({self:n}):"
         if start is None:
             dlim = '\n'
@@ -175,21 +186,15 @@ class PhenomeNode(ContextItem, tag='n'):
             start += '  '
         return head, dlim, start
     
-    def variable(self, name):
-        return Variable(name, self.context)
-    
     def inlet_variables(self, family=None):
-        return self.ins.framed_variables(self.context, family=family)
+        return self.ins.framed_variables(family=family)
     
     def outlet_variables(self, family=None):
-        return self.outs.framed_variables(self.context, family=None, inbound=self.inbound)
+        return self.outs.framed_variables(family=family)
     
-    def describe(self, context=None, start=None, stack=None, inbound=None, right=None):
+    def describe(self, start=None, right=None):
         first = start is None
-        head, dlim, start = self._equations_format(context, start)
-        if stack: context = self.contextualize(context)
-        self.inbound = inbound
-        self.context = context
+        head, dlim, start = self._equations_format(start)
         eqlst = self.equations()
         if right and not first:
             head = '- ' + head
@@ -215,7 +220,7 @@ class PhenomeNode(ContextItem, tag='n'):
                     p = '- '
             eqs = head + eqdlim.join([p + str(i) for i in eqlst]) 
         if self.phenomena:
-            eqs += dlim + dlim.join([i.describe(context, start, stack, inbound, right) for i in self.phenomena])
+            eqs += dlim + dlim.join([i.describe(start, right) for i in self.phenomena])
         return eqs
     
     def diagram(self, file: Optional[str]=None, 
@@ -245,7 +250,7 @@ class PhenomeNode(ContextItem, tag='n'):
         with phn.preferences.temporary() as pref:
             if context_format is not None:
                 pref.context_format = context_format
-            f = phn.digraph_from_node(self, title=str(self), **graph_attrs)
+            f = phn.digraph_from_phenomenode(self, title=str(self), **graph_attrs)
             if display or file:
                 def size(node):
                     phenomena = node.phenomena
@@ -268,9 +273,9 @@ class PhenomeNode(ContextItem, tag='n'):
             else:
                 return f
     
-    def show(self, context_format=None, context=None, start=None, stack=None, inbound=None, right=True):
+    def show(self, context_format=None, start=None, right=True):
         with phn.preferences.temporary() as pref:
             if context_format is not None: pref.context_format = context_format
-            return print(self.describe(context, start, stack, inbound, right))
+            return print(self.describe(start, right))
     
     _ipython_display_ = show

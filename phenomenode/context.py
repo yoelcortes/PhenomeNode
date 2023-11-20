@@ -2,6 +2,7 @@
 """
 """
 from .preferences import preferences
+from typing import Iterable
 __all__ = ('ContextStack', 'ContextFamily', 'ContextItem',
            'Inlet', 'Outlet', 'Phase', 'Chemical', 'Contexts')
 
@@ -70,7 +71,7 @@ class ContextStack:
             if other in self.stack:
                 breakpoint()
             return ContextStack(*self, other)
-        elif isinstance(other, '__iter__'):
+        elif isinstance(other, Iterable):
             for i in other:
                 if isinstance(i, context_types): continue
                 raise ValueError('only contexts can be added; not {type(i).__name__} objects')
@@ -111,11 +112,16 @@ class ContextFamily:
     
     def __add__(self, other):
         if isinstance(other, ContextStack):
-            return ContextStack(self, *other)
+            return ContextStack(self, *other.stack)
         elif other is None:
             return self
         elif isinstance(other, context_types):
             return ContextStack(self, other)
+        elif isinstance(other, Iterable):
+            for i in other:
+                if isinstance(i, context_types): continue
+                raise ValueError('only contexts can be added; not {type(i).__name__} objects')
+            return ContextStack(self, *other)
         else:
             return NotImplemented
     __iadd__ = __add__

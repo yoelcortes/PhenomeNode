@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 """
-import numpy as np
-import phenomephenomenode as phn
+import phenomenode as phn
 from .connection import Connection
 from warnings import warn
 from graphviz import Digraph
@@ -51,16 +50,16 @@ def digraph_from_phenomenode(phenomenode, **graph_attrs):
     return f
 
 def update_digraph_from_path(f, path, depth, node_names, all_connections, connected):
-    phenomenodes = set()
-    superphenomenodes = []
+    phenomena = set()
+    superphenomena = []
     varnodes = set()
     new_connections = []
     other_connections = []
     for i in path:
-        if i.phenomenodes:
-            superphenomenodes.append(i)
+        if i.phenomena:
+            superphenomena.append(i)
         else: 
-            phenomenodes.add(i)
+            phenomena.add(i)
             varnodes.update(i.varnodes)
             for varnode in i.varnodes:
                 new_connections.append(
@@ -72,7 +71,7 @@ def update_digraph_from_path(f, path, depth, node_names, all_connections, connec
                     )
     all_connections.update(new_connections + other_connections)
     update_varnode_names(f, varnodes, node_names)
-    update_phenomenode_names(f, phenomenodes, node_names)
+    update_phenomenode_names(f, phenomena, node_names)
     add_connections(f, new_connections, node_names)
     connected.update(new_connections)
     depth += 1
@@ -85,18 +84,18 @@ def update_digraph_from_path(f, path, depth, node_names, all_connections, connec
             kwargs = dict(bgcolor=color, penwidth='0.2', color=preferences.edge_color)
     else:
         kwargs = dict(color=color, bgcolor='none', penwidth='0.75', style='solid')
-    for i in superphenomenodes:
+    for i in superphenomena:
         with f.subgraph(name='cluster_' + str(hash(i))) as c:
             c.attr(label=str(i), fontname="Arial", 
                    labeljust='l', fontcolor=preferences.label_color, 
                    tooltip=i.get_tooltip_string(),
                    **kwargs)
-            update_digraph_from_path(c, i.phenomenodes, depth, node_names, all_connections, connected)
+            update_digraph_from_path(c, i.phenomena, depth, node_names, all_connections, connected)
 
 
 def update_phenomenode_names(f: Digraph, path, node_names):
     for n in path:
-        if n.phenomenodes: continue
+        if n.phenomena: continue
         kwargs = n.vizoptions()
         node_names[n] = kwargs['name']
         f.node(**kwargs)
@@ -109,7 +108,8 @@ def update_varnode_names(f: Digraph, varnodes, node_names):
         f.node(**kwargs)
 
 def add_connection(f: Digraph, connection, node_names, **edge_options):
-    phenomenode, varnode = connection
+    phenomenode = connection.phenomenode
+    varnode = connection.varnode
     f.attr('edge', label='', taillabel='', headlabel='', labeldistance='2',
            **edge_options)
     tooltip = phenomenode.get_tooltip_string()
@@ -123,7 +123,7 @@ def add_connection(f: Digraph, connection, node_names, **edge_options):
 def add_connections(f: Digraph, connections, node_names, **edge_options):
     # Set attributes for graph and edges
     f.attr('graph', overlap='orthoyx', fontname="Arial",
-           outputorder='edgesfirst', phenomenodesep='0.5', ranksep='0.15', maxiter='1000000')
+           outputorder='edgesfirst', phenomenaep='0.5', ranksep='0.15', maxiter='1000000')
     f.attr('edge', dir='foward', fontname='Arial')
     for connection in connections:
         add_connection(f, connection, node_names, 

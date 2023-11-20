@@ -6,7 +6,7 @@ from .preferences import preferences
 class PhenomeNodeGraphics:
     """Create a PhenomeNodeGraphics object that contains specifications for 
     Graphviz node and edge styles."""
-    __slots__ = ('options', 'category')
+    __slots__ = ('category',)
     
     #: [dict] Node settings
     options = {
@@ -40,7 +40,7 @@ class PhenomeNodeGraphics:
     
     def get_options(self, node): # pragma: no coverage
         """Return node tailored to node specifications"""
-        options = self.node.copy()
+        options = self.options.copy()
         options['name'] = str(hash(node))
         options['label'] = str(node)
         options['fillcolor'] = options['fontcolor'] = options['color'] = self.color

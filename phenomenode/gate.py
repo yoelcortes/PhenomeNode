@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 """
-from .variable import Variable, Variables
-from .node import Node
+from .variable import Variable, Variables, variable_index as index
+from .varnode import VarNode as Node
 from .context import Inlet, Outlet
 
 __all__ = ('Ins', 'Outs')
@@ -26,7 +26,9 @@ class Gate:
         if isa(varnodes, Node):
             self.varnodes = [dock(varnodes)]
         elif isa(varnodes, Variable):
-            self.varnodes = [dock(Node(Variable))]
+            self.varnodes = [dock(Node(varnodes))]
+        elif isa(varnodes, str):
+            self.varnodes = [dock(Node(getattr(index, varnodes)))]
         elif hasattr(varnodes, '__iter__'):
             self.varnodes = []
             for i in varnodes:
@@ -35,8 +37,10 @@ class Gate:
                 elif isa(i, Variable):
                     s = dock(Node(i))
                 else:
-                    raise TypeError(f"{i!r} is not an node")
+                    raise TypeError(f"{i!r} is not a node")
                 self.varnodes.append(s)
+        else:
+            raise TypeError(f"{varnodes!r} is not a list of nodes")
         
     @property
     def variables(self):
@@ -159,14 +163,17 @@ class Ins(Gate):
         self.sink = sink
         super().__init__(varnodes)
     
-    def framed_variables(self, context, family=False):
+    def framed_variables(self, family=False):
         varnodes = self.varnodes
         if not varnodes: return []
         if family:
             variables = self.variables
+            context = [
+                i for i in self.sink.ancestry if i.phenomena
+            ]
             return variables.framed(Inlet.family + context)
         else:
-            return [i.framed_variable(context) for n, i in enumerate(self.varnodes)]
+            return [i.variable.framed(i.get_full_context()) for i in self.varnodes]
     
     def _create_node(self, variable):
         return Node(variable, None, [self.sink])
@@ -189,27 +196,17 @@ class Outs(Gate):
         self.source = source
         super().__init__(varnodes)
     
-    def framed_variables(self, context, family=False, inbound=None):
+    def framed_variables(self, family=False):
         varnodes = self.varnodes
         if not varnodes: return []
-        if inbound is None: inbound = True
         if family:
             variables = self.variables
+            context = [
+                i for i in self.source.ancestry if i.phenomena
+            ]
             return variables.framed(Outlet.family + context)
-        elif inbound:
-            return [
-                i.framed_variable(
-                    sum(sinks, None)
-                    if (sinks:=[i for i in i.sinks if i.phenomena]) else 
-                    context
-                )
-                for n, i in enumerate(self.varnodes)
-            ]
         else:
-            return [
-                i.framed_variable(context)
-                for n, i in enumerate(self.varnodes)
-            ]
+            return [i.variable.framed(i.get_full_context()) for i in self.varnodes]
             
     def _create_node(self, variable):
         return Node(variable, [self.source], None)
