@@ -28,7 +28,18 @@ class Mixer(Unit, tag='x'):
             ins=(bulk_material.outs[0], product.T, product.P, bulk_enthalpy.outs[0]),
             outs=[product.Fcp]
         )
-        
+
+class Flash(Unit, tag='x'):
+    n_ins = 2
+    n_outs = 1
+    def load(self):
+        feed, = self.inlets
+        product, = self.outlets
+        self.pressure_drop = phn.PressureDrop(ins=[feed.P], outs=[product.P])
+        self.bulk_material = bulk_material = phn.BulkMaterial(ins=[feed.Fcp])
+        self.vle = phn.VLE(
+            ins=(bulk_material.outs[0], product.T, product.P),
+        )
 
 # class Split(Node):
 #     n_ins = 1

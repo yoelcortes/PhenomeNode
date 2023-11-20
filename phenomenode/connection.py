@@ -2,29 +2,18 @@
 """
 """
 from typing import NamedTuple, Optional
-from .phenomenode import PhenomeNode
-from .varnode import VarNode
 
 __all__ = ('Connection',)
 
 class Connection:
-    __slots__ = ('source', 'sink')
-    def __init__(self, source, sink):
-        self.source = source
-        self.sink = sink
+    __slots__ = ('phenomenode', 'varnode')
+    def __init__(self, phenomenode, varnode):
+        self.phenomenode = phenomenode
+        self.varnode = varnode
     
-    @property
-    def phenomenode(self):
-        if isinstance(self.source, PhenomeNode):
-            return self.source
-        else:
-            return self.sink
-        
-    @property
-    def varnode(self):
-        if isinstance(self.source, VarNode):
-            return self.source
-        else:
-            return self.sink
+    def __hash__(self):
+        return hash((self.phenomenode, self.varnode))
     
+    def __eq__(self, other):
+        return (self.phenomenode, self.varnode) == (other.phenomenode, other.varnode)
     

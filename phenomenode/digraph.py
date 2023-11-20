@@ -32,7 +32,7 @@ def blank_digraph(format='svg', maxiter='10000000000000000000',
                   Damping='0.995', K='0.5', **graph_attrs):
     # Create a digraph and set direction left to right
     f = Digraph(format=format)
-    f.attr(rankdir='LR', maxiter=maxiter, Damping=Damping, K=K,
+    f.attr(rankdir='TB', maxiter=maxiter, Damping=Damping, K=K,
            penwidth='0', color='none', bgcolor=preferences.background_color,
            fontcolor=preferences.label_color, fontname="Arial",
            labeljust='l', labelloc='t', fontsize='24', constraint='false',
@@ -62,13 +62,14 @@ def update_digraph_from_path(f, path, depth, node_names, all_connections, connec
             phenomena.add(i)
             varnodes.update(i.varnodes)
             for varnode in i.varnodes:
-                new_connections.append(
-                    Connection(varnode, i)
-                )
+                connection = Connection(i, varnode)
+                if connection in all_connections: continue
+                new_connections.append(connection)
                 for neighbor in varnode.neighbors:
-                    other_connections.append(
-                        Connection(neighbor, varnode)
-                    )
+                    if neighbor.phenomena: continue
+                    connection = Connection(neighbor, varnode)
+                    if connection in all_connections: continue
+                    other_connections.append(connection)
     all_connections.update(new_connections + other_connections)
     update_varnode_names(f, varnodes, node_names)
     update_phenomenode_names(f, phenomena, node_names)
@@ -117,13 +118,13 @@ def add_connection(f: Digraph, connection, node_names, **edge_options):
     penwidth = '1.0'
     f.edge(node_names[phenomenode], node_names[varnode], label='', 
            labeltooltip=tooltip, edgetooltip=tooltip, arrowtail='none', 
-           arrowhead='normal', headport='c', tailport='c', color=color,
+           arrowhead='none', headport='c', tailport='c', color=color,
            penwidth=penwidth)
 
 def add_connections(f: Digraph, connections, node_names, **edge_options):
     # Set attributes for graph and edges
-    f.attr('graph', overlap='orthoyx', fontname="Arial",
-           outputorder='edgesfirst', phenomenaep='0.5', ranksep='0.15', maxiter='1000000')
+    f.attr('graph', fontname="Arial", layout='sfdp', splines='true', 
+           outputorder='edgesfirst', nodesep='0.2', ranksep='0.2', maxiter='1000000')
     f.attr('edge', dir='foward', fontname='Arial')
     for connection in connections:
         add_connection(f, connection, node_names, 

@@ -125,8 +125,11 @@ class VariableIndex:
     Fc = Variable('F', chemicals)
     FVc = Variable('F', ContextStack(chemicals, gas))
     FLc = Variable('F', ContextStack(chemicals, liquid))
-    KVc = Variable('KV', ContextStack(chemicals, gas))
-    KLc = Variable('KL', ContextStack(chemicals, liquid))
+    KVc = Variable('K', ContextStack(chemicals, gas))
+    KLc = Variable('K', ContextStack(chemicals, liquid))
+    hV = Variable('h', gas)
+    hL = Variable('h', liquid)
+    DeltaP = Variable('ΔP')
     
     def __new__(cls): return cls
 

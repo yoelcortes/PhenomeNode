@@ -31,29 +31,23 @@ class VarNode:
         return self.sinks + self.sources
     
     def label(self):
-        return self.get_tooltip_string('s')
+        return self.get_tooltip_string('n')
     
     def vizoptions(self):
         options = {
             'shape': 'box',
-            'style': 'filled',
             'gradientangle': '0',
-            'width': '0.6',
-            'height': '0.6',
+            'width': '0.1',
+            'height': '0.1',
             'orientation': '0.0',
-            'peripheries': '1',
-            'margin': 'default',
-            'fontname': 'Arial'
+            'peripheries': '0',
+            'margin': '0',
+            'fontname': 'Arial',
+            'fillcolor': 'none',
         }
         options['name'] = str(hash(self))
         if 'label' not in options:
             options['label'] = str(self)
-        if 'fillcolor' not in options:
-            options['fillcolor'] = phn.preferences.node_color
-        if 'fontcolor' not in options:
-            options['fontcolor'] = phn.preferences.node_label_color
-        if 'color' not in options:
-            options['color'] = phn.preferences.node_periphery_color
         return options
     
     def get_full_context(self):
@@ -62,12 +56,12 @@ class VarNode:
         variable = self.variable
         if sources: 
             n = [i for i in sources[0].outs if i.variable is variable].index(self)
-            outext = Outlet(n) + sources
+            outext = Outlet(n) + sources[:-1]
         else:
             outext = None
             if sinks:
                 n = [i for i in sinks[0].ins if i.variable is variable].index(self)
-                intext = Inlet(n) + sinks
+                intext = Inlet(n) + sinks[:-1]
             else:
                 intext = None
         return outext or intext
@@ -80,7 +74,6 @@ class VarNode:
             ),
             fmt
         )
-        if len(label) > 15: label = label[:12] + '...'
         return label
     
     __str__ = label

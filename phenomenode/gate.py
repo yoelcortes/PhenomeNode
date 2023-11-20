@@ -163,17 +163,8 @@ class Ins(Gate):
         self.sink = sink
         super().__init__(varnodes)
     
-    def framed_variables(self, family=False):
-        varnodes = self.varnodes
-        if not varnodes: return []
-        if family:
-            variables = self.variables
-            context = [
-                i for i in self.sink.ancestry if i.phenomena
-            ]
-            return variables.framed(Inlet.family + context)
-        else:
-            return [i.variable.framed(i.get_full_context()) for i in self.varnodes]
+    def framed_variables(self):
+        return [i.variable.framed(i.get_full_context()) for i in self.varnodes]
     
     def _create_node(self, variable):
         return Node(variable, None, [self.sink])
@@ -196,17 +187,8 @@ class Outs(Gate):
         self.source = source
         super().__init__(varnodes)
     
-    def framed_variables(self, family=False):
-        varnodes = self.varnodes
-        if not varnodes: return []
-        if family:
-            variables = self.variables
-            context = [
-                i for i in self.source.ancestry if i.phenomena
-            ]
-            return variables.framed(Outlet.family + context)
-        else:
-            return [i.variable.framed(i.get_full_context()) for i in self.varnodes]
+    def framed_variables(self):
+        return [i.variable.framed(i.get_full_context()) for i in self.varnodes]
             
     def _create_node(self, variable):
         return Node(variable, [self.source], None)

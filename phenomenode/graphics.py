@@ -23,11 +23,12 @@ class PhenomeNodeGraphics:
     
     #: [dict] Colors by category
     colors = {
-        'material': '#98876e',
+        'material': 'black',
         'transport': '#33cc33',
         'reaction': '#5fc1cf',
         'equilibrium': '#a180b8',
         'energy': '#f1777f',
+        'pressure': '#8ead3e',
     }
     
     def __init__(self, category):
@@ -57,3 +58,4 @@ energy_graphics = PhenomeNodeGraphics(category='energy')
 equilibrium_graphics = PhenomeNodeGraphics(category='equilibrium')
 reaction_graphics = PhenomeNodeGraphics(category='reaction')
 transport_graphics = PhenomeNodeGraphics(category='transport')
+pressure_graphics = PhenomeNodeGraphics(category='pressure')

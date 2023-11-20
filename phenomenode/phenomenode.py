@@ -186,11 +186,11 @@ class PhenomeNode(ContextItem, tag='n'):
             start += '  '
         return head, dlim, start
     
-    def inlet_variables(self, family=None):
-        return self.ins.framed_variables(family=family)
+    def inlet_variables(self):
+        return self.ins.framed_variables()
     
-    def outlet_variables(self, family=None):
-        return self.outs.framed_variables(family=family)
+    def outlet_variables(self):
+        return self.outs.framed_variables()
     
     def describe(self, start=None, right=None):
         first = start is None
