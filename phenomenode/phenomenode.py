@@ -3,8 +3,8 @@
 """
 import phenomenode as phn
 from .variable import Variable, variable_index
-from .context import ContextItem, ContextStack
-from .gate import Ins, Outs
+from .context import ContextItem, ContextStack, Contexts
+from .gate import Inlets, Outlets
 from .registry import Registry
 from .graphics import material_graphics
 from .utils import AbstractMethod
@@ -37,8 +37,8 @@ def default_variables(variables, default_sequence):
             if i is None and d is not None:
                 new_variables.append(d)
             elif isinstance(i, str):
-                new_variables.append(getattr(variable_index, str))
-            elif isinstance(i, (phn.Variable, phn.VarNode)):
+                new_variables.append(getattr(variable_index, i))
+            elif isinstance(i, (phn.Variable, phn.VarNode)) or hasattr(i, 'varnodes'):
                 new_variables.append(i)
             else:
                 raise ValueError('inlets and outlets must be variables or variable nodes')
@@ -69,6 +69,8 @@ class PhenomeNode(ContextItem, tag='n'):
                 raise ValueError(f'tag {tag!r} already used')
             cls.tag = tag
             cls.registered_tags.add(tag)
+        else:
+            cls.tag = None
         if not isinstance(cls.default_ins, DefaultSequence):
             if isinstance(cls.default_ins, Mapping):
                 cls.default_ins = DefaultSequence(**cls.default_ins)
@@ -93,6 +95,7 @@ class PhenomeNode(ContextItem, tag='n'):
                         for i in cls.default_outs
                     ])
                 )
+        Contexts.append(cls)
     
     def __new__(cls, ins=None, outs=None, name=None, **kwargs):
         self = super().__new__(cls, name)
@@ -113,18 +116,24 @@ class PhenomeNode(ContextItem, tag='n'):
         self.init_outs(outs)
     
     def init_ins(self, ins):
-        self.ins = Ins(
+        self.ins = Inlets(
             self, default_variables(ins, self.default_ins)
         )
         
     def init_outs(self, outs):
-        self.outs = Outs(
+        self.outs = Outlets(
             self, default_variables(outs, self.default_outs)
         )
     
     @property
     def varnodes(self):
-        return self.ins + self.outs
+        varnodes = [] 
+        for i in self.ins + self.outs:
+            if hasattr(i, 'varnodes'):
+                varnodes.extend(i.varnodes)
+            else:
+                varnodes.append(i)
+        return varnodes
     
     #: Abstract method for loading phenomena. This method is called after `init`
     load = AbstractMethod
@@ -264,6 +273,8 @@ class PhenomeNode(ContextItem, tag='n'):
                     size_key = 'network'
                 else:
                     size_key = 'big-network'
+                # import dot2tex
+                # texcode = dot2tex.dot2tex(f.source)
                 height = (
                     phn.preferences.graphviz_html_height
                     [size_key]

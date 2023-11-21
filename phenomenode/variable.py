@@ -59,6 +59,8 @@ class Variable(Quantity):
         if not context: return name
         if fmt == 's':
             return f"{name}{context:s}"
+        elif fmt == 'l':
+            return f"${name}_" "{" f"{context:{fmt}}" "}$"
         else:
             return f"{name}[{context:{fmt}}]"
         
@@ -116,21 +118,25 @@ class VariableIndex:
     split = Variable('θ') # Split fraction
     chemicals = chemicals = Chemical.family
     phases = phases = Phase.family
-    liquid = Phase('L')
-    solid = Phase('S')
-    gas = Phase('G')
+    liquid = Phase('l')
+    solid = Phase('s')
+    gas = Phase('g')
     inlets = Inlet.family
     outlets = Outlet.family
     Fcp = Variable('F', ContextStack(chemicals, phases))
     Fc = Variable('F', chemicals)
     FVc = Variable('F', ContextStack(chemicals, gas))
     FLc = Variable('F', ContextStack(chemicals, liquid))
+    FL = Variable('F', liquid) # Liquid flow rate [by mol]
+    FV = Variable('FV', liquid) # Vapor flow rate [by mol]
     KVc = Variable('K', ContextStack(chemicals, gas))
     KLc = Variable('K', ContextStack(chemicals, liquid))
     hV = Variable('h', gas)
     hL = Variable('h', liquid)
     DeltaP = Variable('ΔP')
-    
+    z = Variable('z') # Bulk composition [by mol]
+    zL = Variable('z', liquid) # Liquid composition [by mol]
+    zV = Variable('z', gas) # Vapor composition [by mol]
     def __new__(cls): return cls
 
 variable_index = VariableIndex

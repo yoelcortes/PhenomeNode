@@ -34,37 +34,42 @@ class VarNode:
         return self.get_tooltip_string('n')
     
     def vizoptions(self):
+        tooltip = self.get_tooltip_string('n')
         options = {
-            'shape': 'box',
             'gradientangle': '0',
             'width': '0.1',
             'height': '0.1',
             'orientation': '0.0',
-            'peripheries': '0',
+            'peripheries': '1',
             'margin': '0',
             'fontname': 'Arial',
             'fillcolor': 'none',
+            'shape': 'point',
+            'style': 'filled',
+            'color': '#f3c354',
+            'tooltip': tooltip,
         }
         options['name'] = str(hash(self))
+        # if 'texlbl' not in options:
+        #     options['texlbl'] = self.get_tooltip_string('l')
         if 'label' not in options:
-            options['label'] = str(self)
+            options['label'] = ''
         return options
     
     def get_full_context(self):
         sources = [i for i in self.sources if i.phenomena]
         sinks = [i for i in self.sinks if i.phenomena]
-        variable = self.variable
         if sources: 
-            n = [i for i in sources[0].outs if i.variable is variable].index(self)
-            outext = Outlet(n) + sources[:-1]
+            for n, i in enumerate(sources[0].outs):
+                if self in i.varnodes: break
+            context = Outlet(n) + sources[:-1]
+        elif sinks:
+            for n, i in enumerate(sinks[0].ins):
+                if self in i.varnodes: break
+            context = Inlet(n) + sinks[:-1]       
         else:
-            outext = None
-            if sinks:
-                n = [i for i in sinks[0].ins if i.variable is variable].index(self)
-                intext = Inlet(n) + sinks[:-1]
-            else:
-                intext = None
-        return outext or intext
+            context = None
+        return context
     
     def get_tooltip_string(self, fmt=None):
         if fmt is None: fmt = phn.preferences.context_format

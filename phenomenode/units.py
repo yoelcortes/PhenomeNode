@@ -10,7 +10,8 @@ from . unit import Unit
 __all__ = (
     'Mixer', 
     # 'Splitter', 
-    # 'VLEStage'
+    'MultiStageVLE',
+    'VLEStage'
     # 'LLEStage', 
 )
 
@@ -18,29 +19,88 @@ class Mixer(Unit, tag='x'):
     n_ins = 2
     n_outs = 1
     def load(self):
-        feeds = self.inlets
-        product = self.outlets[0]
+        feeds = self.ins
+        product, = self.outs
         self.min_pressure = phn.MinPressure(ins=[i.P for i in feeds], outs=[product.P])
         self.bulk_material = bulk_material = phn.BulkMaterial(ins=[i.Fcp for i in feeds])
-        self.enthalpies = enthalpies = [phn.Enthalpy(ins=i.varnodes) for i in feeds]
-        self.bulk_enthalpy = bulk_enthalpy = phn.BulkEnthalpy(ins=[i.outs[0] for i in enthalpies])
+        self.enthalpies = enthalpies = [phn.Enthalpy(ins=[*i.varnodes]) for i in feeds]
+        self.bulk_enthalpy = bulk_enthalpy = phn.BulkEnthalpy(
+            ins=[i.outs[0] for i in enthalpies]
+        )
         self.equilibrium = phn.Equilibrium(
             ins=(bulk_material.outs[0], product.T, product.P, bulk_enthalpy.outs[0]),
             outs=[product.Fcp]
         )
 
-class Flash(Unit, tag='x'):
+class VLEStage(Unit, tag='f'):
     n_ins = 2
-    n_outs = 1
+    n_outs = 2
     def load(self):
-        feed, = self.inlets
-        product, = self.outlets
-        self.pressure_drop = phn.PressureDrop(ins=[feed.P], outs=[product.P])
-        self.bulk_material = bulk_material = phn.BulkMaterial(ins=[feed.Fcp])
-        self.vle = phn.VLE(
-            ins=(bulk_material.outs[0], product.T, product.P),
+        Lfeed, Vfeed = feeds = self.ins
+        self.enthalpies = enthalpies = [phn.Enthalpy(ins=[*i.varnodes]) for i in feeds]
+        self.bulk_enthalpy = bulk_enthalpy = phn.BulkEnthalpy(
+            ins=[i.outs[0] for i in enthalpies]
         )
-
+        Hbulk, = bulk_enthalpy.outs
+        vapor, liquid = self.outs
+        vapor.P = Lfeed.P
+        liquid.P = Vfeed.P
+        vapor.T = liquid.T
+        
+        self.bulk_material = bulk_material = phn.BulkMaterial(ins=[Lfeed.Fcp, Vfeed.Fcp])
+        self.vle = vle = phn.VLE(
+            ins=(bulk_material.outs[0], vapor.T, vapor.P, index.V),
+        )
+        Fc, T, P, V = vle.ins
+        KVc, = vle.outs
+        self.vle_material_balance = vle_material_balance = phn.VLEMaterialBalance(
+            ins=(Fc, KVc, V),
+        )
+        FVc, FLc = vle_material_balance.outs
+        vapor.Fcp = FVc
+        liquid.Fcp = FLc
+        self.bulk_vapor = bulk_vapor = phn.BulkComponents(ins=[FVc])
+        FV = bulk_vapor.outs
+        self.bulk_liquid = bulk_liquid = phn.BulkComponents(ins=[FLc])
+        FL = bulk_liquid.outs
+        self.vapor_composition = vapor_composition = phn.Composition(ins=[FVc, FV], outs=[index.zV])
+        zV, = vapor_composition.outs
+        self.liquid_composition = liquid_composition = phn.Composition(ins=[FLc, FL], outs=[index.zV])
+        zL, = liquid_composition.outs
+        self.liquid_enthalpy = liquid_enthalpy = phn.Enthalpy(
+            ins=[zL, T, P], outs=['hL'],
+        )
+        hL, = liquid_enthalpy.outs
+        self.vapor_enthalpy = vapor_enthalpy = phn.Enthalpy(
+            ins=[zV, T, P], outs=['hV'],
+        )
+        hV, = vapor_enthalpy.outs
+        self.vle_energy_balance = vle_energy_balance = phn.VLEEnergyBalance(
+            ins=[Hbulk, hL, hV, FL], outs=[V]
+        )
+        self.bubble_point = bubble_point = phn.BubblePoint(
+            ins=[FLc, T, P, KVc],
+        )
+        self.dew_point = dew_point = phn.DewPoint(
+            ins=[FVc, T, P, KVc],
+        )
+        
+class MultiStageVLE(Unit, tag='v'):
+    n_ins = 2
+    n_outs = 2
+    def load(self):
+        n_stages = self.n_stages
+        streams = [
+            [phn.Stream(), phn.Stream()] # Vapor, Liquid
+            for i in range(n_stages + 2)
+        ]
+        self.vle_stages = [
+            VLEStage(
+                ins=[streams[i+1][0], streams[i-1][1]],
+                outs=streams[i]
+            ) for i in range(1, n_stages + 1)
+        ]
+            
 # class Split(Node):
 #     n_ins = 1
 #     n_outs = 2

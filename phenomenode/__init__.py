@@ -15,6 +15,7 @@ from .units import *
 from .phenomenode import *
 from .phenomena import *
 from .digraph import *
+from .stream import *
 
 from . import unit
 from . import units
@@ -27,6 +28,7 @@ from . import context
 from . import varnode
 from . import term
 from . import digraph
+from . import stream
 
 __all__ = (
     *__all__,
@@ -38,6 +40,7 @@ __all__ = (
     'registry',
     'preferences',
     'digraph',
+    *stream.__all__,
     *unit.__all__,
     *units.__all__,
     *term.__all__,

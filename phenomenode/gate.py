@@ -5,11 +5,11 @@ from .variable import Variable, Variables, variable_index as index
 from .varnode import VarNode as Node
 from .context import Inlet, Outlet
 
-__all__ = ('Ins', 'Outs')
+__all__ = ('Inlets', 'Outlets')
 
 class Gate:
     """
-    Abstract class for a sequence of varnodes connected to a phenomenode.
+    Abstract class for a sequence of nodes connected to a phenomenode.
     
     Abstract methods:
         * _dock(self, node) -> Node
@@ -18,52 +18,60 @@ class Gate:
         * framed_variables(self) -> list[ActiveVariables]
     
     """
-    __slots__ = ('varnodes',)
+    __slots__ = ('nodes',)
         
-    def __init__(self, varnodes):
+    def __init__(self, nodes):
         dock = self._dock
         isa = isinstance
-        if isa(varnodes, Node):
-            self.varnodes = [dock(varnodes)]
-        elif isa(varnodes, Variable):
-            self.varnodes = [dock(Node(varnodes))]
-        elif isa(varnodes, str):
-            self.varnodes = [dock(Node(getattr(index, varnodes)))]
-        elif hasattr(varnodes, '__iter__'):
-            self.varnodes = []
-            for i in varnodes:
-                if isa(i, Node):
+        if isa(nodes, Node) or hasattr(nodes, 'varnodes'):
+            self.nodes = [dock(nodes)]
+        elif isa(nodes, Variable):
+            self.nodes = [dock(Node(nodes))]
+        elif isa(nodes, str):
+            self.nodes = [dock(Node(getattr(index, nodes)))]
+        elif hasattr(nodes, '__iter__'):
+            self.nodes = []
+            for i in nodes:
+                if isa(i, Node) or hasattr(i, 'varnodes'):
                     s = dock(i)
                 elif isa(i, Variable):
                     s = dock(Node(i))
                 else:
                     raise TypeError(f"{i!r} is not a node")
-                self.varnodes.append(s)
+                self.nodes.append(s)
         else:
-            raise TypeError(f"{varnodes!r} is not a list of nodes")
+            raise TypeError(f"{nodes!r} is not a list of nodes")
         
     @property
-    def variables(self):
-        variables = [i.variable for i in self.varnodes]
-        return Variables(*variables)
-        
+    def varnodes(self):
+        varnodes = []
+        for i in self.nodes:
+            if hasattr(i, 'varnodes'):
+                varnodes.extend(i.varnodes)
+            else:
+                varnodes.append(i)
+        return varnodes
+    
+    def framed_variables(self):
+        return [i.variable.framed(i.get_full_context()) for i in self.varnodes]
+    
     def _create_node(self, variable):
         return Node(variable)
         
     def __add__(self, other):
-        return self.varnodes + other
+        return self.nodes + other
     def __radd__(self, other):
-        return other + self.varnodes
+        return other + self.nodes
     
     # DO NOT DELETE: These should be implemented by child class
     # def _dock(self, node): return node
     # def _undock(self, node): pass
 
-    def _set_nodes(self, slice, varnodes):
-        varnodes = [self._as_node(i) for i in varnodes]
-        all_nodes = self.varnodes
+    def _set_nodes(self, slice, nodes):
+        nodes = [self._as_node(i) for i in nodes]
+        all_nodes = self.nodes
         for node in all_nodes[slice]: self._undock(node)
-        all_nodes[slice] = varnodes
+        all_nodes[slice] = nodes
         for node in all_nodes: self._dock(node)
        
     def _as_node(self, node):
@@ -78,49 +86,49 @@ class Gate:
        
     @property
     def size(self):
-        return self.varnodes.__len__()
+        return self.nodes.__len__()
     
     def __len__(self):
-        return self.varnodes.__len__()
+        return self.nodes.__len__()
     
     def __bool__(self):
-        return bool(self.varnodes)
+        return bool(self.nodes)
     
     def _set_node(self, int, node):
         node = self._as_node(node)
-        self._undock(self.varnodes[int])
-        self.varnodes[int] = self._dock(node)
+        self._undock(self.nodes[int])
+        self.nodes[int] = self._dock(node)
     
     def empty(self):
-        for i in self.varnodes: self._undock(i)
-        self.varnodes = []
+        for i in self.nodes: self._undock(i)
+        self.nodes = []
     
     def insert(self, index, node):
         self._undock(node)
         self._dock(node)
-        self.varnodes.insert(index, node)
+        self.nodes.insert(index, node)
     
     def append(self, node):
         self._undock(node)
         self._dock(node)
-        self.varnodes.append(node)
+        self.nodes.append(node)
     
-    def extend(self, varnodes):
-        for i in varnodes:
+    def extend(self, nodes):
+        for i in nodes:
             self._undock(i)
             self._dock(i)
-            self.varnodes.append(i)
+            self.nodes.append(i)
     
     def replace(self, node, other_node):
         index = self.index(node)
         self[index] = other_node
 
     def index(self, node):
-        return self.varnodes.index(node)
+        return self.nodes.index(node)
 
     def pop(self, index):
-        varnodes = self.varnodes
-        node = varnodes.pop(index)
+        nodes = self.nodes
+        node = nodes.pop(index)
         return node
 
     def remove(self, node):
@@ -129,17 +137,17 @@ class Gate:
         self.replace(node, node)
         
     def clear(self):
-        for i in self.varnodes: self._undock(i)
-        self.varnodes.clear()
+        for i in self.nodes: self._undock(i)
+        self.nodes.clear()
     
     def reverse(self):
-        self.varnodes.reverse()
+        self.nodes.reverse()
     
     def __iter__(self):
-        return iter(self.varnodes)
+        return iter(self.nodes)
     
     def __getitem__(self, index):
-        return self.varnodes[index]
+        return self.nodes[index]
     
     def __setitem__(self, index, item):
         isa = isinstance
@@ -152,53 +160,53 @@ class Gate:
                              f"indices for '{type(self).__name__}' objects")
     
     def __repr__(self):
-        return repr(self.varnodes)
+        return repr(self.nodes)
 
 
-class Ins(Gate):
-    """Create an Ins object which serves as inlet varnodes for a phenomenode."""
+class Inlets(Gate):
+    """Create an Inlets object which serves as inlet nodes for a phenomenode."""
     __slots__ = ('sink',)
     
-    def __init__(self, sink, varnodes):
+    def __init__(self, sink, nodes):
         self.sink = sink
-        super().__init__(varnodes)
-    
-    def framed_variables(self):
-        return [i.variable.framed(i.get_full_context()) for i in self.varnodes]
+        super().__init__(nodes)
     
     def _create_node(self, variable):
         return Node(variable, None, [self.sink])
     
-    def _dock(self, node): 
-        node.sinks.appendleft(self.sink)
+    def _dock(self, node):
+        if hasattr(node, 'varnodes'):
+            for i in node.varnodes: self._dock(i)
+        else:
+            node.sinks.appendleft(self.sink)
         return node
 
     def _undock(self, node): 
         if self.sink in node.sinks: 
-            raise RuntimeError('undocking varnodes breaks node connections')
+            raise RuntimeError('undocking nodes breaks node connections')
             node.sinks.remove(self.sink)
     
         
-class Outs(Gate):
-    """Create an Outs object which serves as outlet varnodes for a phenomenode."""
+class Outlets(Gate):
+    """Create an Outlets object which serves as outlet nodes for a phenomenode."""
     __slots__ = ('source',)
     
-    def __init__(self, source, varnodes):
+    def __init__(self, source, nodes):
         self.source = source
-        super().__init__(varnodes)
-    
-    def framed_variables(self):
-        return [i.variable.framed(i.get_full_context()) for i in self.varnodes]
+        super().__init__(nodes)
             
     def _create_node(self, variable):
         return Node(variable, [self.source], None)
     
     def _dock(self, node): 
-        node.sources.appendleft(self.source)
+        if hasattr(node, 'varnodes'):
+            for i in node.varnodes: self._dock(i)
+        else:
+            node.sources.appendleft(self.source)
         return node
     
     def _undock(self, node): 
         if self.sources in node.sources: 
-            raise RuntimeError('undocking varnodes breaks node connections')
+            raise RuntimeError('undocking nodes breaks node connections')
             node.sources.remove(self.source)
         

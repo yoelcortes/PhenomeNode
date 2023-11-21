@@ -134,7 +134,7 @@ class ContextFamily:
       
     def __format__(self, fmt):
         if fmt == '': fmt = preferences.context_format
-        if fmt in ('s', 'n'):
+        if fmt in ('s', 'n', 'l'):
             return self.tag
         elif fmt == 'f':
             return f"{format_name(type(self).__name__)}"
@@ -193,8 +193,11 @@ class ContextItem:
         if fmt == '': fmt = preferences.context_format
         if fmt == 's':
             return ""
-        elif fmt == 'n':
-            return f"{self.tag}={self.name}"    
+        elif fmt == 'n' or fmt == 'l':
+            if self.tag is None:
+                return str(self.name)
+            else:
+                return f"{self.tag}={self.name}"    
         elif fmt == 'f':
             return str(self)
         else:

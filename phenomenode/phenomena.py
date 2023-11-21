@@ -19,19 +19,18 @@ __all__ = (
     'BubblePoint',
     'DewPoint',
     'MinPressure',
-    'Enthalpy',
     'Equilibrium',
+    'Enthalpy',
+    'BulkComponents',
+    'Composition',
+    'VLEMaterialBalance',
+    'VLEEnergyBalance',
 )
 
 class BulkEnthalpy(PhenomeNode):
     default_ins = 'H'
     default_outs = 'H'
     graphics = energy_graphics
-    
-    def load(self):
-        feeds = self.ins
-        product, = self.outs
-        for i in [*feeds, product]: assert i.variable == index.H
     
     def equations(self):
         Hs = self.inlet_variables()
@@ -61,6 +60,26 @@ class BulkMaterial(PhenomeNode):
         return [EQ(f.sum[index.phases](*Fcps), Fc)]
 
 
+class Composition(PhenomeNode):
+    default_ins = ['Fc', 'F']
+    default_outs = 'z'
+    
+    def equations(self):
+        Fc, F = self.inlet_variables()
+        z, = self.outlet_variables()
+        return [EQ(Fc / F, z)]        
+
+class BulkComponents(PhenomeNode):
+    default_ins = 'Fc'
+    default_outs = 'F'
+    graphics = material_graphics
+    
+    def equations(self):
+        Fc, = self.inlet_variables()
+        F, = self.outlet_variables()
+        return [EQ(f.sum[index.chemicals](Fc), F)]
+
+
 class VLEMaterialBalance(PhenomeNode):
     default_ins = ['Fc', 'KVc', 'V']
     default_outs = ['FVc', 'FLc']
@@ -76,35 +95,36 @@ class VLEMaterialBalance(PhenomeNode):
     
 
 class VLEEnergyBalance(PhenomeNode):
-    default_ins = ['hL', 'hV', 'V', 'FLc']
-    default_outs = ['FVc', 'FLc']
+    default_ins = ['H', 'hL', 'hV', 'FL']
+    default_outs = ['V']
     graphics = energy_graphics
     
     def equations(self):
-        Fc, KVc, V = self.inlet_variables()
-        FVc, FLc = self.outlet_variables()
+        H, hL, hV, FL = self.inlet_variables()
+        V, = self.outlet_variables()
         return [
-            EQ((1 - V) * Fc / (V * KVc + (1 - V)), FLc),
-            EQ(Fc - FLc, FVc),
+            EQ((H/FL - hL) / hV, V / (1 - V)),
         ]
     
     
-    
-
 class VLE(PhenomeNode):
-    default_ins = ['Fc', 'P', 'V', 'KVc', 'T']
+    default_ins = ['Fc', 'P', 'V', 'T']
+    default_outs = ['KVc']
     graphics = equilibrium_graphics
     
     def equations(self):
-        return [EQ(f.vle(*self.inlet_variables()), 0)]
+        KVc, = self.outlet_variables()
+        return [EQ(f.vle(*self.inlet_variables()), KVc)]
     
 
 class LLE(PhenomeNode):
-    default_ins = ['Fc', 'T', 'P', 'L', 'KLc']
+    default_ins = ['Fc', 'T', 'P', 'L']
+    default_outs = ['KLc']
     graphics = equilibrium_graphics
     
     def equations(self):
-        return [EQ(f.lle(*self.inlet_variables()), 0)]
+        KLc, = self.outlet_variables()
+        return [EQ(f.lle(*self.inlet_variables()), KLc)]
     
     
 class BubblePoint(PhenomeNode):

@@ -2,8 +2,8 @@ autodisplay: true
 background_color: '#ffffffff'
 context_format: n
 depth_colors:
-- '#ffffff9f'
-- '#7ac0832f'
+- '#d5edf02f'
+- '#ffffffdf'
 edge_color: '#4e4e4e'
 fill_cluster: true
 graphviz_format: svg
