@@ -35,6 +35,11 @@ class Mixer(Unit, tag='x'):
 class VLEStage(Unit, tag='f'):
     n_ins = 2
     n_outs = 2
+    
+    def prepare(self, ins, outs, alg=None):
+        self.alg = alg
+        super().prepare(ins, outs)
+    
     def load(self):
         Lfeed, Vfeed = feeds = self.ins
         self.enthalpies = enthalpies = [phn.Enthalpy(ins=[*i.varnodes]) for i in feeds]
@@ -46,50 +51,87 @@ class VLEStage(Unit, tag='f'):
         vapor.P = Lfeed.P
         liquid.P = Vfeed.P
         vapor.T = liquid.T
-        
         self.bulk_material = bulk_material = phn.BulkMaterial(ins=[Lfeed.Fcp, Vfeed.Fcp])
-        self.vle = vle = phn.VLE(
-            ins=(bulk_material.outs[0], vapor.T, vapor.P, index.V),
-        )
-        Fc, T, P, V = vle.ins
-        KVc, = vle.outs
-        self.vle_material_balance = vle_material_balance = phn.VLEMaterialBalance(
-            ins=(Fc, KVc, V),
-        )
-        FVc, FLc = vle_material_balance.outs
-        vapor.Fcp = FVc
-        liquid.Fcp = FLc
-        self.bulk_vapor = bulk_vapor = phn.BulkComponents(ins=[FVc])
-        FV = bulk_vapor.outs
-        self.bulk_liquid = bulk_liquid = phn.BulkComponents(ins=[FLc])
-        FL = bulk_liquid.outs
-        self.vapor_composition = vapor_composition = phn.Composition(ins=[FVc, FV], outs=[index.zV])
-        zV, = vapor_composition.outs
-        self.liquid_composition = liquid_composition = phn.Composition(ins=[FLc, FL], outs=[index.zV])
-        zL, = liquid_composition.outs
-        self.liquid_enthalpy = liquid_enthalpy = phn.Enthalpy(
-            ins=[zL, T, P], outs=['hL'],
-        )
-        hL, = liquid_enthalpy.outs
-        self.vapor_enthalpy = vapor_enthalpy = phn.Enthalpy(
-            ins=[zV, T, P], outs=['hV'],
-        )
-        hV, = vapor_enthalpy.outs
-        self.vle_energy_balance = vle_energy_balance = phn.VLEEnergyBalance(
-            ins=[Hbulk, hL, hV, FL], outs=[V]
-        )
-        self.bubble_point = bubble_point = phn.BubblePoint(
-            ins=[FLc, T, P, KVc],
-        )
-        self.dew_point = dew_point = phn.DewPoint(
-            ins=[FVc, T, P, KVc],
-        )
+        Fc = bulk_material.outs[0]
+        alg = self.alg
+        if alg is None:
+            self.vle = vle = phn.VLE(
+                ins=(Fc, vapor.T, vapor.P, index.V),
+            )
+            Fc, T, P, V = vle.ins
+            KVc, = vle.outs
+            self.vle_material_balance = vle_material_balance = phn.VLEMaterialBalance(
+                ins=(Fc, KVc, V),
+            )
+            FVc, FLc = vle_material_balance.outs
+            vapor.Fcp = FVc
+            liquid.Fcp = FLc
+            self.bulk_vapor = bulk_vapor = phn.BulkComponents(ins=[FVc])
+            FV, = bulk_vapor.outs
+            self.bulk_liquid = bulk_liquid = phn.BulkComponents(ins=[FLc])
+            FL, = bulk_liquid.outs
+            self.vapor_composition = vapor_composition = phn.Composition(ins=[FVc, FV], outs=[index.zV])
+            zV, = vapor_composition.outs
+            self.liquid_composition = liquid_composition = phn.Composition(ins=[FLc, FL], outs=[index.zV])
+            zL, = liquid_composition.outs
+            self.liquid_enthalpy = liquid_enthalpy = phn.Enthalpy(
+                ins=[zL, T, P], outs=['hL'],
+            )
+            hL, = liquid_enthalpy.outs
+            self.vapor_enthalpy = vapor_enthalpy = phn.Enthalpy(
+                ins=[zV, T, P], outs=['hV'],
+            )
+            hV, = vapor_enthalpy.outs
+            self.vle_energy_balance = vle_energy_balance = phn.VLEEnergyBalance(
+                ins=[Hbulk, hL, hV, FL], outs=[V]
+            )
+            self.bubble_point = bubble_point = phn.BubblePoint(
+                ins=[FLc, T, P, KVc],
+            )
+            self.dew_point = dew_point = phn.DewPoint(
+                ins=[FVc, T, P, KVc],
+            )
+        elif alg == 'Wang-Henke':
+            self.bubble_point = bubble_point = phn.BubblePoint(
+                ins=[None, vapor.T, vapor.P, None],
+            )
+            FLc, T, P, KVc = bubble_point.ins
+            self.vle_material_balance = vle_material_balance = phn.VLEMaterialBalance(
+                ins=(Fc, KVc, None), outs=(None, FLc)
+            )
+            Fc, KVc, V = vle_material_balance.ins
+            FVc, FLc = vle_material_balance.outs
+            vapor.Fcp = FVc
+            liquid.Fcp = FLc
+            self.bulk_vapor = bulk_vapor = phn.BulkComponents(ins=[FVc])
+            FV, = bulk_vapor.outs
+            self.bulk_liquid = bulk_liquid = phn.BulkComponents(ins=[FLc])
+            FL, = bulk_liquid.outs
+            self.vapor_composition = vapor_composition = phn.Composition(ins=[FVc, FV], outs=[index.zV])
+            zV, = vapor_composition.outs
+            self.liquid_composition = liquid_composition = phn.Composition(ins=[FLc, FL], outs=[index.zV])
+            zL, = liquid_composition.outs
+            self.liquid_enthalpy = liquid_enthalpy = phn.Enthalpy(
+                ins=[zL, T, P], outs=['hL'],
+            )
+            hL, = liquid_enthalpy.outs
+            self.vapor_enthalpy = vapor_enthalpy = phn.Enthalpy(
+                ins=[zV, T, P], outs=['hV'],
+            )
+            hV, = vapor_enthalpy.outs
+            self.vle_energy_balance = phn.VLEEnergyBalance(
+                ins=[Hbulk, hL, hV, FL], outs=[V]
+            )
+        else:
+            raise RuntimeError(f'unknown algorithm {alg!r}')
         
 class MultiStageVLE(Unit, tag='v'):
     n_ins = 2
     n_outs = 2
+    
     def load(self):
         n_stages = self.n_stages
+        alg = self.alg
         streams = [
             [phn.Stream(), phn.Stream()] # Vapor, Liquid
             for i in range(n_stages + 2)
@@ -97,7 +139,8 @@ class MultiStageVLE(Unit, tag='v'):
         self.vle_stages = [
             VLEStage(
                 ins=[streams[i+1][0], streams[i-1][1]],
-                outs=streams[i]
+                outs=streams[i],
+                alg=alg,
             ) for i in range(1, n_stages + 1)
         ]
             

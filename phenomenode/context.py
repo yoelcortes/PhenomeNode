@@ -194,10 +194,10 @@ class ContextItem:
         if fmt == 's':
             return ""
         elif fmt == 'n' or fmt == 'l':
-            if self.tag is None:
-                return str(self.name)
-            else:
+            if self.tag:
                 return f"{self.tag}={self.name}"    
+            else:
+                return str(self.name)
         elif fmt == 'f':
             return str(self)
         else:

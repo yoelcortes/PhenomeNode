@@ -50,13 +50,20 @@ class PhenomeNode(ContextItem, tag='n'):
     registry = Registry()
     default_ins = DefaultSequence()
     default_outs = DefaultSequence()
+    tickets = {}
+    
+    @property
+    def ticket(self):
+        return self.tickets[self.tag]
+    @ticket.setter
+    def ticket(self, ticket):
+        self.tickets[self.tag] = ticket
     
     def __init_subclass__(cls, tag=None, priority=None):
         if priority is None:
             cls.priority += 1
         else:
             cls.priority += priority
-        cls.ticket = 0
         name = cls.__name__
         if cls.load:
             if tag is None:
@@ -65,12 +72,9 @@ class PhenomeNode(ContextItem, tag='n'):
                 raise ValueError('tag must be a string')
             elif len(tag) != 1:
                 raise ValueError('tag must be a (roman or greek) letter')
-            if tag in cls.registered_tags: 
-                raise ValueError(f'tag {tag!r} already used')
             cls.tag = tag
             cls.registered_tags.add(tag)
-        else:
-            cls.tag = None
+        cls.tickets[cls.tag] = 0
         if not isinstance(cls.default_ins, DefaultSequence):
             if isinstance(cls.default_ins, Mapping):
                 cls.default_ins = DefaultSequence(**cls.default_ins)
@@ -236,6 +240,8 @@ class PhenomeNode(ContextItem, tag='n'):
                 format: Optional[str]=None,
                 display: Optional[bool]=True,
                 context_format: Optional[int]=None,
+                label_nodes: Optional[bool]=None,
+                cluster: Optional[bool]=None,
                 **graph_attrs):
         """
         Display a `Graphviz <https://pypi.org/project/graphviz/>`__ diagram
@@ -257,8 +263,9 @@ class PhenomeNode(ContextItem, tag='n'):
         
         """
         with phn.preferences.temporary() as pref:
-            if context_format is not None:
-                pref.context_format = context_format
+            if context_format is not None: pref.context_format = context_format
+            if label_nodes is not None: pref.label_nodes = label_nodes
+            if cluster is not None: pref.cluster = cluster
             f = phn.digraph_from_phenomenode(self, title=str(self), **graph_attrs)
             if display or file:
                 def size(node):

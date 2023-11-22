@@ -78,20 +78,24 @@ def update_digraph_from_path(f, path, depth, node_names, all_connections, connec
     depth += 1
     N_colors = len(preferences.depth_colors)
     color = preferences.depth_colors[(depth - 1) % N_colors]
-    if preferences.fill_cluster:
-        if depth == 1:
-            kwargs = dict(bgcolor=color, penwidth='0')
+    if preferences.cluster:
+        if preferences.fill_cluster:
+            if depth == 1:
+                kwargs = dict(bgcolor=color, penwidth='0')
+            else:
+                kwargs = dict(bgcolor=color, penwidth='0.2', color=preferences.edge_color)
         else:
-            kwargs = dict(bgcolor=color, penwidth='0.2', color=preferences.edge_color)
+            kwargs = dict(color=color, bgcolor='none', penwidth='0.75', style='solid')
+        for i in superphenomena:
+            with f.subgraph(name='cluster_' + str(hash(i))) as c:
+                c.attr(label=str(i), fontname="Arial", 
+                       labeljust='l', fontcolor=preferences.label_color, 
+                       tooltip=i.get_tooltip_string(),
+                       **kwargs)
+                update_digraph_from_path(c, i.phenomena, depth, node_names, all_connections, connected)
     else:
-        kwargs = dict(color=color, bgcolor='none', penwidth='0.75', style='solid')
-    for i in superphenomena:
-        with f.subgraph(name='cluster_' + str(hash(i))) as c:
-            c.attr(label=str(i), fontname="Arial", 
-                   labeljust='l', fontcolor=preferences.label_color, 
-                   tooltip=i.get_tooltip_string(),
-                   **kwargs)
-            update_digraph_from_path(c, i.phenomena, depth, node_names, all_connections, connected)
+        for i in superphenomena:
+            update_digraph_from_path(f, i.phenomena, depth, node_names, all_connections, connected)
 
 
 def update_phenomenode_names(f: Digraph, path, node_names):

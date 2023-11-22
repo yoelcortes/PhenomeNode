@@ -21,7 +21,7 @@ class DisplayPreferences:
     edge_color: '#90918e'
     label_color: '#90918e'
     depth_colors: ['#f98f609f']
-    label_edges: True
+    label_nodes: True
     node_color: '#555f69'
     node_label_color: 'white'
     node_periphery_color: '#90918e'
@@ -38,17 +38,20 @@ class DisplayPreferences:
         'edge_color',
         'label_color', 
         'depth_colors', 
-        'label_edges',
+        'label_nodes',
         'node_color', 'node_label_color', 'node_periphery_color',
         'fill_cluster', 'graphviz_format', 'tooltips_full_results',
         'context_format',
         'graphviz_html_height',
+        'cluster',
     )
     
     def __init__(self):
-        #: Whether to label the edges with sources and sinks in process 
-        #: flow diagrams.
-        self.label_edges: bool = True
+        #: Whether to cluster phenomena.
+        self.cluster = True
+        
+        #: Whether to label the variable nodes in process diagrams.
+        self.label_nodes: bool = False
         
         #: Whether to automatically generate diagrams when displaying an object in the
         #: IPython console.

@@ -1,5 +1,6 @@
 autodisplay: true
 background_color: '#ffffffff'
+cluster: true
 context_format: n
 depth_colors:
 - '#d5edf02f'
@@ -18,7 +19,7 @@ graphviz_html_height:
   - 225px
   - 400px
 label_color: '#4e4e4e'
-label_edges: true
+label_nodes: false
 node_color: white:#CDCDCD
 node_label_color: black
 node_periphery_color: '#4e4e4e'

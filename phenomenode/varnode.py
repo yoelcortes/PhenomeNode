@@ -40,33 +40,56 @@ class VarNode:
             'width': '0.1',
             'height': '0.1',
             'orientation': '0.0',
-            'peripheries': '1',
+            'peripheries': '0' if phn.preferences.label_nodes else '1',
             'margin': '0',
             'fontname': 'Arial',
             'fillcolor': 'none',
-            'shape': 'point',
+            'shape': 'plaintext' if phn.preferences.label_nodes else 'point',
             'style': 'filled',
             'color': '#f3c354',
             'tooltip': tooltip,
+            'label': tooltip if phn.preferences.label_nodes else '',
+            'name': str(hash(self)),
         }
-        options['name'] = str(hash(self))
         # if 'texlbl' not in options:
         #     options['texlbl'] = self.get_tooltip_string('l')
-        if 'label' not in options:
-            options['label'] = ''
         return options
     
     def get_full_context(self):
-        sources = [i for i in self.sources if i.phenomena]
-        sinks = [i for i in self.sinks if i.phenomena]
-        if sources: 
-            for n, i in enumerate(sources[0].outs):
-                if self in i.varnodes: break
-            context = Outlet(n) + sources[:-1]
+        sources = self.sources
+        sinks = self.sinks
+        if sources:
+            for source in sources:
+                if source.phenomena: 
+                    unit = True
+                    break
+            else:
+                 source = sources[0]
+                 unit = False
+            if unit:
+                for n, i in enumerate(source.outs):
+                    if self in i.varnodes: break
+                context = Outlet(n) + source.ancestry[1:-1]
+            else:
+                for n, i in enumerate(source.outs):
+                    if self is i: break
+                context = Outlet(n) + source.ancestry[:-1]
         elif sinks:
-            for n, i in enumerate(sinks[0].ins):
-                if self in i.varnodes: break
-            context = Inlet(n) + sinks[:-1]       
+            for sink in sinks:
+                if sink.phenomena: 
+                    unit = True
+                    break
+            else:
+                 sink = sinks[0]
+                 unit = False
+            if isinstance(sink, phn.Unit):
+                for n, i in enumerate(sink.ins):
+                    if self in i.varnodes: break
+                context = Inlet(n) + sink.ancestry[1:-1]
+            else:
+                for n, i in enumerate(sink.ins):
+                    if self is i: break
+                context = Inlet(n) + sink.ancestry[:-1]
         else:
             context = None
         return context
