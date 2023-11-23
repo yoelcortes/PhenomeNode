@@ -3,7 +3,7 @@
 """
 from .preferences import preferences
 from typing import Iterable
-__all__ = ('ContextStack', 'ContextFamily', 'ContextItem',
+__all__ = ('ContextStack', 'ContextFamily', 'ContextItem', 'Number',
            'Inlet', 'Outlet', 'Phase', 'Chemical', 'Contexts')
 
 Contexts = []
@@ -134,7 +134,7 @@ class ContextFamily:
       
     def __format__(self, fmt):
         if fmt == '': fmt = preferences.context_format
-        if fmt in ('s', 'n', 'l'):
+        if fmt in ('s', 'n', 'l', 'h'):
             return self.tag
         elif fmt == 'f':
             return f"{format_name(type(self).__name__)}"
@@ -153,16 +153,25 @@ class ContextItem:
     __slots__ = ('name',)
     registered_tags = set()
     priority = 0
-    
+    tickets = {}
+
+    @property
+    def ticket(self):
+        return self.tickets[self.tag]
+    @ticket.setter
+    def ticket(self, ticket):
+        self.tickets[self.tag] = ticket
+        
     def __init_subclass__(cls, tag=None, abstract=False, priority=None):
         if abstract: return
         if priority is None:
             cls.priority += 1
         else:
             cls.priority += priority
-        cls.ticket = 0
         name = cls.__name__
-        if tag is None:
+        if tag == 'None':
+            tag = None
+        elif tag is None:
             tag = name[0].lower()
         elif not isinstance(tag, str):
             raise ValueError('tag must be a string')
@@ -172,6 +181,7 @@ class ContextItem:
             raise ValueError(f'tag {tag!r} already used')
         cls.tag = tag
         cls.registered_tags.add(tag)
+        cls.tickets[cls.tag] = 0
         cls.family = type(name + 's', (ContextFamily,), {'tag': tag})()
         Contexts.append(cls)
     
@@ -180,10 +190,9 @@ class ContextItem:
         self.name = self.take_ticket() if name is None else name
         return self
     
-    @classmethod
-    def take_ticket(cls):
-        ticket = cls.ticket
-        cls.ticket += 1
+    def take_ticket(self):
+        ticket = self.ticket
+        self.ticket += 1
         return ticket
     
     __iadd__ = __add__ = ContextFamily.__add__
@@ -193,11 +202,14 @@ class ContextItem:
         if fmt == '': fmt = preferences.context_format
         if fmt == 's':
             return ""
-        elif fmt == 'n' or fmt == 'l':
-            if self.tag:
-                return f"{self.tag}={self.name}"    
+        elif fmt == 'n' or fmt == 'l' or fmt == 'h':
+            name = self.name
+            if isinstance(name, str):
+                return name
+            elif self.tag:
+                return f"{self.tag}={name}"    
             else:
-                return str(self.name)
+                return str(name)
         elif fmt == 'f':
             return str(self)
         else:
@@ -214,5 +226,6 @@ class Inlet(ContextItem): pass
 class Outlet(ContextItem): pass
 class Phase(ContextItem): pass
 class Chemical(ContextItem): pass
+class Number(ContextItem, tag='None'): pass
 
 context_types = (ContextFamily, ContextItem)

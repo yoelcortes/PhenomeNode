@@ -39,17 +39,19 @@ def blank_digraph(format='svg', maxiter='10000000000000000000',
            **graph_attrs)
     return f
 
-def digraph_from_phenomenode(phenomenode, **graph_attrs):
+def digraph_from_phenomenode(phenomenode, filterkey, **graph_attrs):
     f = blank_digraph(**graph_attrs) 
     all_connections = set()
     connected = set()
     phenomenode_names = {}
     update_phenomenode_names(f, [phenomenode], phenomenode_names)
-    update_digraph_from_path(f, [phenomenode], 0, phenomenode_names, all_connections, connected)
+    update_digraph_from_path(f, [phenomenode], 0, phenomenode_names,
+                             all_connections, connected, filterkey)
     add_connections(f, all_connections.difference(connected), phenomenode_names)
     return f
 
-def update_digraph_from_path(f, path, depth, node_names, all_connections, connected):
+def update_digraph_from_path(f, path, depth, node_names, all_connections,
+                             connected, filterkey):
     phenomena = set()
     superphenomena = []
     varnodes = set()
@@ -58,7 +60,7 @@ def update_digraph_from_path(f, path, depth, node_names, all_connections, connec
     for i in path:
         if i.phenomena:
             superphenomena.append(i)
-        else: 
+        elif not (filterkey and filterkey(i)): 
             phenomena.add(i)
             varnodes.update(i.varnodes)
             for varnode in i.varnodes:
@@ -67,6 +69,7 @@ def update_digraph_from_path(f, path, depth, node_names, all_connections, connec
                 new_connections.append(connection)
                 for neighbor in varnode.neighbors:
                     if neighbor.phenomena: continue
+                    if filterkey and filterkey(neighbor): continue
                     connection = Connection(neighbor, varnode)
                     if connection in all_connections: continue
                     other_connections.append(connection)
@@ -92,10 +95,12 @@ def update_digraph_from_path(f, path, depth, node_names, all_connections, connec
                        labeljust='l', fontcolor=preferences.label_color, 
                        tooltip=i.get_tooltip_string(),
                        **kwargs)
-                update_digraph_from_path(c, i.phenomena, depth, node_names, all_connections, connected)
+                update_digraph_from_path(c, i.phenomena, depth, node_names,
+                                         all_connections, connected, filterkey)
     else:
         for i in superphenomena:
-            update_digraph_from_path(f, i.phenomena, depth, node_names, all_connections, connected)
+            update_digraph_from_path(f, i.phenomena, depth, node_names, 
+                                     all_connections, connected, filterkey)
 
 
 def update_phenomenode_names(f: Digraph, path, node_names):
@@ -128,7 +133,7 @@ def add_connection(f: Digraph, connection, node_names, **edge_options):
 def add_connections(f: Digraph, connections, node_names, **edge_options):
     # Set attributes for graph and edges
     f.attr('graph', fontname="Arial", layout='fdp', splines='curved', concentrate='true',
-           outputorder='edgesfirst', nodesep='0.2', ranksep='0.2', maxiter='100000',
+           outputorder='edgesfirst', nodesep='0.1', ranksep='0.2', maxiter='1000000',
            overlap='false')
     f.attr('edge', dir='foward', fontname='Arial')
     for connection in connections:
@@ -157,10 +162,17 @@ def save_digraph(digraph, file, format): # pragma: no coverage
             "cannot specify format extension; file already has format "
            f"extension '{file.split()[-1]}'"
         )
-    img = digraph.pipe(format=format)
-    f = open(file, 'wb')
-    f.write(img)
-    f.close()
+    if format == 'tex':
+        import dot2tex
+        texcode = dot2tex.dot2tex(digraph.source, math=True)
+        f = open(file, 'w', encoding="utf-8")
+        f.write(texcode)
+        f.close()
+    else:
+        img = digraph.pipe(format=format)
+        f = open(file, 'wb')
+        f.write(img)
+        f.close()
     
 def finalize_digraph(digraph, file, format, height=None): # pragma: no coverage
     if preferences.raise_exception: 

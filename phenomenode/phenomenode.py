@@ -6,9 +6,9 @@ from .variable import Variable, variable_index
 from .context import ContextItem, ContextStack, Contexts
 from .gate import Inlets, Outlets
 from .registry import Registry
-from .graphics import material_graphics
+from .graphics import graphics
 from .utils import AbstractMethod
-from typing import Optional, Mapping
+from typing import Optional, Mapping, Callable
 
 __all__ = ('PhenomeNode',)
 
@@ -46,24 +46,13 @@ def default_variables(variables, default_sequence):
 
 class PhenomeNode(ContextItem, tag='n'):
     __slots__ = ('ins', 'outs', 'phenomena', 'inbound', 'context')
-    graphics = material_graphics
     registry = Registry()
     default_ins = DefaultSequence()
     default_outs = DefaultSequence()
-    tickets = {}
+    category = None
     
-    @property
-    def ticket(self):
-        return self.tickets[self.tag]
-    @ticket.setter
-    def ticket(self, ticket):
-        self.tickets[self.tag] = ticket
-    
-    def __init_subclass__(cls, tag=None, priority=None):
-        if priority is None:
-            cls.priority += 1
-        else:
-            cls.priority += priority
+    def __init_subclass__(cls, tag=None):
+        if 'priority' not in cls.__dict__: cls.priority += 1
         name = cls.__name__
         if cls.load:
             if tag is None:
@@ -100,6 +89,10 @@ class PhenomeNode(ContextItem, tag='n'):
                     ])
                 )
         Contexts.append(cls)
+        
+    @property
+    def graphics(self):
+        return graphics[self.category]
     
     def __new__(cls, ins=None, outs=None, name=None, **kwargs):
         self = super().__new__(cls, name)
@@ -107,7 +100,7 @@ class PhenomeNode(ContextItem, tag='n'):
         self.registry.open_context_level()
         self.load()
         self.phenomena = self.registry.close_context_level()
-        for i in self.phenomena: i.ancestry.append(i)
+        for i in self.phenomena: i.ancestry.append(self)
         self.registry.register(self)
         self.ancestry = [self]
         return self
@@ -130,9 +123,37 @@ class PhenomeNode(ContextItem, tag='n'):
         )
     
     @property
+    def nested_phenomena(self):
+        phenomena = self.phenomena
+        if phenomena:
+            return sum([i.nested_phenomena for i in self.phenomena], phenomena)
+        else:
+            return phenomena
+    
+    @property
     def varnodes(self):
         varnodes = [] 
         for i in self.ins + self.outs:
+            if hasattr(i, 'varnodes'):
+                varnodes.extend(i.varnodes)
+            else:
+                varnodes.append(i)
+        return varnodes
+    
+    @property
+    def inlet_varnodes(self):
+        varnodes = [] 
+        for i in self.ins:
+            if hasattr(i, 'varnodes'):
+                varnodes.extend(i.varnodes)
+            else:
+                varnodes.append(i)
+        return varnodes
+    
+    @property
+    def outlet_varnodes(self):
+        varnodes = [] 
+        for i in self.outs:
             if hasattr(i, 'varnodes'):
                 varnodes.extend(i.varnodes)
             else:
@@ -242,6 +263,8 @@ class PhenomeNode(ContextItem, tag='n'):
                 context_format: Optional[int]=None,
                 label_nodes: Optional[bool]=None,
                 cluster: Optional[bool]=None,
+                filterkey: Optional[Callable]=None,
+                label_format: Optional[str]=None,
                 **graph_attrs):
         """
         Display a `Graphviz <https://pypi.org/project/graphviz/>`__ diagram
@@ -266,7 +289,8 @@ class PhenomeNode(ContextItem, tag='n'):
             if context_format is not None: pref.context_format = context_format
             if label_nodes is not None: pref.label_nodes = label_nodes
             if cluster is not None: pref.cluster = cluster
-            f = phn.digraph_from_phenomenode(self, title=str(self), **graph_attrs)
+            if label_format is not None: pref.label_format = label_format
+            f = phn.digraph_from_phenomenode(self, filterkey, title=str(self), **graph_attrs)
             if display or file:
                 def size(node):
                     phenomena = node.phenomena
@@ -280,8 +304,6 @@ class PhenomeNode(ContextItem, tag='n'):
                     size_key = 'network'
                 else:
                     size_key = 'big-network'
-                # import dot2tex
-                # texcode = dot2tex.dot2tex(f.source)
                 height = (
                     phn.preferences.graphviz_html_height
                     [size_key]

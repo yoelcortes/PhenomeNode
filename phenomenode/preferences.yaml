@@ -19,6 +19,7 @@ graphviz_html_height:
   - 225px
   - 400px
 label_color: '#4e4e4e'
+label_format: n
 label_nodes: false
 node_color: white:#CDCDCD
 node_label_color: black

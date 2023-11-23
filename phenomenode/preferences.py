@@ -44,6 +44,7 @@ class DisplayPreferences:
         'context_format',
         'graphviz_html_height',
         'cluster',
+        'label_format',
     )
     
     def __init__(self):
@@ -91,7 +92,10 @@ class DisplayPreferences:
         self.tooltips_full_results: bool = False
         
         #: Format for context subscripts.
-        self.context_format: int = 'n'
+        self.context_format: str = 'n'
+        
+        #: Format for context subscripts of node labels.
+        self.label_format: str = 'n'
         
         #: Displayed height of graphviz html diagrams without and with full results.
         self.graphviz_html_height: dict[str, tuple[str, str]] = {

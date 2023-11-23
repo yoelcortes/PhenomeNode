@@ -47,7 +47,7 @@ class Variable(Quantity):
             return self._hash
         
     def __eq__(self, other):
-        return self.__class__ is other.__class__ and self.name == other.name and self.context is other.context
+        return format(self, 'n') == format(other, 'n')
         
     def __repr__(self):
         return f"{type(self).__name__}({self.name!r}, {self.context!r})"
@@ -60,9 +60,13 @@ class Variable(Quantity):
         if fmt == 's':
             return f"{name}{context:s}"
         elif fmt == 'l':
-            return f"${name}_" "{" f"{context:{fmt}}" "}$"
-        else:
+            return f"{name}_" "{" f"{context:{fmt}}" "}"
+        elif fmt == 'h':
+            return f"<{name}<SUB>{context:{fmt}}</SUB>>"
+        elif fmt == 'n':
             return f"{name}[{context:{fmt}}]"
+        else:
+            raise ValueError(f'invalid format {fmt!r}')
         
     def __str__(self):
         return format(self, 's')
@@ -118,9 +122,9 @@ class VariableIndex:
     split = Variable('θ') # Split fraction
     chemicals = chemicals = Chemical.family
     phases = phases = Phase.family
-    liquid = Phase('l')
-    solid = Phase('s')
-    gas = Phase('g')
+    liquid = Phase('liq')
+    solid = Phase('sol')
+    gas = Phase('gas')
     inlets = Inlet.family
     outlets = Outlet.family
     Fcp = Variable('F', ContextStack(chemicals, phases))
@@ -128,7 +132,7 @@ class VariableIndex:
     FVc = Variable('F', ContextStack(chemicals, gas))
     FLc = Variable('F', ContextStack(chemicals, liquid))
     FL = Variable('F', liquid) # Liquid flow rate [by mol]
-    FV = Variable('FV', liquid) # Vapor flow rate [by mol]
+    FV = Variable('F', gas) # Vapor flow rate [by mol]
     KVc = Variable('K', ContextStack(chemicals, gas))
     KLc = Variable('K', ContextStack(chemicals, liquid))
     hV = Variable('h', gas)

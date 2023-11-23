@@ -19,15 +19,16 @@ class Registry:
     
     def open_context_level(self):
         contexts = self.contexts
-        tickets = [i.ticket for i in phn.Contexts]
-        for i in phn.Contexts: i.ticket = 0
+        tickets = phn.ContextItem.tickets
+        old_tickets = tickets.copy()
+        for i in tickets: tickets[i] = 0
         self.contexts = []
-        self.context_levels.append([contexts, tickets])
+        self.context_levels.append([contexts, old_tickets])
         
     def close_context_level(self):
         contexts = self.contexts
-        self.contexts, tickets = self.context_levels.pop()
-        for i, j in zip(phn.Contexts, tickets): i.ticket = j
+        self.contexts, old_tickets = self.context_levels.pop()
+        phn.ContextItem.tickets = old_tickets
         return contexts
     
     def __contains__(self, obj):

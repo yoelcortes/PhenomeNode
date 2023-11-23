@@ -52,10 +52,11 @@ class PhenomeNodeGraphics:
 
 
 # %% Graphics components
-
-material_graphics = PhenomeNodeGraphics(category='material')
-energy_graphics = PhenomeNodeGraphics(category='energy')
-equilibrium_graphics = PhenomeNodeGraphics(category='equilibrium')
-reaction_graphics = PhenomeNodeGraphics(category='reaction')
-transport_graphics = PhenomeNodeGraphics(category='transport')
-pressure_graphics = PhenomeNodeGraphics(category='pressure')
+graphics = dict(
+    material=PhenomeNodeGraphics(category='material'),
+    energy=PhenomeNodeGraphics(category='energy'),
+    equilibrium=PhenomeNodeGraphics(category='equilibrium'),
+    reaction=PhenomeNodeGraphics(category='reaction'),
+    transport=PhenomeNodeGraphics(category='transport'),
+    pressure=PhenomeNodeGraphics(category='pressure'),
+)

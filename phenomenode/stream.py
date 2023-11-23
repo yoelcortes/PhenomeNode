@@ -37,13 +37,16 @@ def as_streams(streams):
 
 class Stream:
     """Create a stream which defines associated variables."""
-    __slots__ = ('Fcp', 'T', 'P', 'varnodes')
     
     def __init__(self):
-        self.Fcp = Fcp = VarNode(index.Fcp)
-        self.T = T = VarNode(index.T)
-        self.P = P = VarNode(index.P)
-        self.varnodes = (Fcp, T, P)
+        self.Fcp = VarNode(index.Fcp)
+        self.T = VarNode(index.T)
+        self.P = VarNode(index.P)
+        self.H = VarNode(index.H)
         
+    @property
+    def varnodes(self):
+        return (*self.__dict__.values(),)
+    
     def __repr__(self):
         return f"{type(self).__name__}({self.Fcp!r}, {self.T!r}, {self.P!r}))"
