@@ -6,7 +6,10 @@ from .context import ContextStack, ContextItem, ContextFamily, Chemical, Phase, 
 from .quantity import Quantity
 from .preferences import preferences
 
-__all__ = ('Variable', 'Variables', 'variable_index')
+__all__ = (
+    'Variable', 'Variables', 'variable_index', 
+    # 'variable_categories'
+)
 
 class Variable(Quantity):
     __slots__ = ('name', 'context', '_hash')
@@ -144,3 +147,21 @@ class VariableIndex:
     def __new__(cls): return cls
 
 variable_index = VariableIndex
+
+# variables_by_category = dict(
+#     material = (
+#         'F', 'z', 'θ', 'V', 'L',
+#     ),
+#     equilibrium = (
+#         'K', 
+#     ),
+#     energy = (
+#         'h', 'H', 'G', 'S', 'Q', 'T', 'A',
+#     ),
+#     pressure = (
+#         'P', 'ΔP',
+#     ),
+# )
+# variable_categories = {}
+# for category, variables in variables_by_category.items():
+#     for i in variables: variable_categories[i] = category

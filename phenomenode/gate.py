@@ -40,7 +40,7 @@ class Gate:
                     raise TypeError(f"{i!r} is not a node")
                 self.nodes.append(s)
         else:
-            raise TypeError(f"{nodes!r} is not a list of nodes")
+            raise TypeError(f"nodes must be a list of nodes; not a {type(nodes).__name__!r} object")
         
     @property
     def varnodes(self):

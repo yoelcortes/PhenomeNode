@@ -45,7 +45,7 @@ def default_variables(variables, default_sequence):
         return new_variables
 
 class PhenomeNode(ContextItem, tag='n'):
-    __slots__ = ('ins', 'outs', 'phenomena', 'inbound', 'context')
+    __slots__ = ('ins', 'outs', 'phenomena', 'inbound', 'context', 'ancestry')
     registry = Registry()
     default_ins = DefaultSequence()
     default_outs = DefaultSequence()
@@ -100,7 +100,7 @@ class PhenomeNode(ContextItem, tag='n'):
         self.registry.open_context_level()
         self.load()
         self.phenomena = self.registry.close_context_level()
-        for i in self.phenomena: i.ancestry.append(self)
+        for i in self.nested_phenomena: i.ancestry.append(self)
         self.registry.register(self)
         self.ancestry = [self]
         return self
@@ -199,15 +199,8 @@ class PhenomeNode(ContextItem, tag='n'):
     def __exit__(self, type, exception, traceback):
         if self.phenomena or self.ins or self.outs:
             raise RuntimeError('node was modified before exiting `with` statement')
-        self.phenomena = phenomena = tuple(self.registry.close_context_level())
-        inlets = sum([i.ins for i in phenomena], [])
-        feeds = [i for i in inlets if not i.sources]
-        outlets = sum([i.outs for i in phenomena], [])
-        products = [i for i in outlets if not i.sinks]   
-        self.ins.edges[:] = feeds
-        self.outs.edges[:] = products
-        for i in feeds: i.sinks.append(self)
-        for i in products: i.sources.append(self)
+        self.phenomena = self.registry.close_context_level()
+        for i in self.nested_phenomena: i.ancestry.append(self)
         if exception: raise exception
     
     def _equations_format(self, start):

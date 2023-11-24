@@ -3,6 +3,8 @@
 """
 from .preferences import preferences
 
+__all__ = ('PhenomeNodeGraphics',)
+
 class PhenomeNodeGraphics:
     """Create a PhenomeNodeGraphics object that contains specifications for 
     Graphviz node and edge styles."""
@@ -23,7 +25,7 @@ class PhenomeNodeGraphics:
     
     #: [dict] Colors by category
     colors = {
-        'material': 'black',
+        'material': '#403a48',
         'transport': '#33cc33',
         'reaction': '#5fc1cf',
         'equilibrium': '#a180b8',

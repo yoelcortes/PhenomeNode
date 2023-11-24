@@ -91,7 +91,7 @@ def update_digraph_from_path(f, path, depth, node_names, all_connections,
             kwargs = dict(color=color, bgcolor='none', penwidth='0.75', style='solid')
         for i in superphenomena:
             with f.subgraph(name='cluster_' + str(hash(i))) as c:
-                c.attr(label=str(i), fontname="Arial", 
+                c.attr(label=str(i), fontname="Arial", fontsize='8',
                        labeljust='l', fontcolor=preferences.label_color, 
                        tooltip=i.get_tooltip_string(),
                        **kwargs)
@@ -133,7 +133,7 @@ def add_connection(f: Digraph, connection, node_names, **edge_options):
 def add_connections(f: Digraph, connections, node_names, **edge_options):
     # Set attributes for graph and edges
     f.attr('graph', fontname="Arial", layout='fdp', splines='curved', concentrate='true',
-           outputorder='edgesfirst', nodesep='0.1', ranksep='0.2', maxiter='1000000',
+           outputorder='edgesfirst', nodesep='0.1', ranksep='0.2', maxiter='10000',
            overlap='false')
     f.attr('edge', dir='foward', fontname='Arial')
     for connection in connections:

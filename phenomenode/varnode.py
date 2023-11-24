@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 """
-from .variable import Variables, variable_index
+from .variable import Variables, variable_index#, variable_categories
 from .context import Outlet, Inlet
 from collections import deque
 import phenomenode as phn
@@ -62,6 +62,8 @@ class VarNode:
     
     def vizoptions(self):
         tooltip = self.get_tooltip_string(phn.preferences.label_format)
+        color = '#b4b1ae'
+        # color = phn.PhenomeNodeGraphics.colors[variable_categories[self.variable.name]]
         options = {
             'gradientangle': '0',
             'width': '0.5' if phn.preferences.label_nodes else '0.1',
@@ -73,7 +75,7 @@ class VarNode:
             'fillcolor': 'none',
             'shape': 'circle' if phn.preferences.label_nodes else 'point',
             'style': 'filled',
-            'color': '#b4b1ae',
+            'color': color,
             'tooltip': tooltip,
             'label': tooltip if phn.preferences.label_nodes else '',
             'name': str(hash(self)),

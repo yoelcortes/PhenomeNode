@@ -33,23 +33,33 @@ class Mixer(Unit, tag='x'):
             outs=[product.Fcp]
         )
 
-class VLEStage(Unit, tag='f'):
+class VLEStage(Unit, tag='s'):
     n_ins = 2
     n_outs = 2
     
-    def prepare(self, ins, outs, alg=None):
+    def prepare(self, ins, outs, alg=None, location=None):
         self.alg = alg
-        Vfeed, Lfeed = ins
         vapor, liquid = outs
-        vapor.P = Lfeed.P
-        liquid.P = Vfeed.P
+        if location is None: location = 'middle'
+        if location == 'middle':
+            Vfeed, Lfeed, *others = ins
+            vapor.P = Lfeed.P
+            liquid.P = Vfeed.P
+        elif location == 'bottom':
+            Lfeed, *others = ins
+            vapor.P = Lfeed.P
+        elif location == 'top':
+            Vfeed, *others = ins
+            liquid.P = Vfeed.P
+        else:
+            raise ValueError(f'invalid stage location {location!r}')
         vapor.T = liquid.T
-        vapor.Fcp = phn.VarNode(index.FVc)
-        liquid.Fcp = phn.VarNode(index.FLc)
+        vapor.Fcp.variable = index.FVc
+        liquid.Fcp.variable = index.FLc
         super().prepare(ins, outs)
     
     def load(self):
-        Vfeed, Lfeed = feeds = self.ins
+        feeds = self.ins
         enthalpies = [i.H for i in feeds]
         enthalpies.append('Q')
         self.bulk_enthalpy = bulk_enthalpy = phn.BulkEnthalpy(
@@ -57,11 +67,9 @@ class VLEStage(Unit, tag='f'):
         )
         Hbulk, = bulk_enthalpy.outs
         vapor, liquid = self.outs
-        vapor.P = Lfeed.P
-        liquid.P = Vfeed.P
         vapor.T = liquid.T
         self.pressure_drop = phn.PressureDrop(ins=[vapor.P, None], outs=[liquid.P])
-        self.bulk_material = bulk_material = phn.BulkMaterial(ins=[Lfeed.Fcp, Vfeed.Fcp])
+        self.bulk_material = bulk_material = phn.BulkMaterial(ins=[i.Fcp for i in feeds])
         Fc = bulk_material.outs[0]
         alg = self.alg
         if alg is None:
@@ -137,19 +145,20 @@ class VLEStage(Unit, tag='f'):
             raise RuntimeError(f'unknown algorithm {alg!r}')
         
 
-class LLEStage(Unit, tag='f'):
+class LLEStage(Unit, tag='s'):
     n_ins = 2
     n_outs = 2
     
     def prepare(self, ins, outs, alg=None):
         LIQ, liq = outs
-        LIQ.Fcp = phn.VarNode(index.FLc)
-        liq.Fcp = phn.VarNode(index.FLc)
+        LIQ.Fcp.variable = index.FLc
+        liq.Fcp.variable = index.FLc
         super().prepare(ins, outs)
     
     def load(self):
-        Lfeed, lfeed = feeds = self.ins
+        feeds = self.ins
         enthalpies = [i.H for i in feeds]
+        enthalpies.append(index.Q)
         self.bulk_enthalpy = bulk_enthalpy = phn.BulkEnthalpy(
             ins=enthalpies
         )
@@ -157,7 +166,7 @@ class LLEStage(Unit, tag='f'):
         LIQ, liq = self.outs
         # Assume pressures are given by pumps, so no need to add equations
         LIQ.T = liq.T
-        self.bulk_material = bulk_material = phn.BulkMaterial(ins=[Lfeed.Fcp, lfeed.Fcp])
+        self.bulk_material = bulk_material = phn.BulkMaterial(ins=[i.Fcp for i in feeds])
         Fc = bulk_material.outs[0]
         self.lle = lle = phn.LLE(
             ins=(Fc, LIQ.T, LIQ.P, index.L),
@@ -187,42 +196,93 @@ class LLEStage(Unit, tag='f'):
         self.lle_energy_balance = lle_energy_balance = phn.EQEnergyBalance(
             ins=[Hbulk, hl, hL, Fl], outs=[L]
         )
+        mul = phn.Multiply(ins=[hL, FL], outs=[LIQ.H], category='energy')
+        mul = phn.Multiply(ins=[hl, Fl], outs=[liq.H], category='energy')
         
         
 class MultiStageVLE(Unit, tag='v'):
     n_ins = 2
     n_outs = 2
     
+    def prepare(self, ins, outs, n_stages, alg=None, feed_stages=None):
+        if feed_stages is None: feed_stages = (0, -1)
+        self.alg = alg
+        self.feed_stages = feed_stages
+        self.n_stages = n_stages
+        super().prepare(ins, outs)
+        
     def load(self):
         n_stages = self.n_stages
         alg = self.alg
-        streams = [
-            [phn.Stream(), phn.Stream()] # Vapor, Liquid
-            for i in range(n_stages + 2)
+        vapor, liquid = self.outs
+        outlet_streams = [
+            [vapor, phn.Stream()], 
+            *[[phn.Stream(), phn.Stream()] # Vapor, Liquid
+              for i in range(n_stages - 2)],
+            [phn.Stream(), liquid]
         ]
+        feed_stages = [(i if i >= 0 else n_stages + i) for i in self.feed_stages]
+        feeds_by_stage = {i: [] for i in feed_stages}
+        for i, j in zip(feed_stages, self.ins): feeds_by_stage[i].append(j)
+        inlet_streams = []
+        for i in range(n_stages):
+            if i == 0:
+                inlets = [outlet_streams[i+1][0]]
+            elif i == n_stages - 1:
+                inlets = [outlet_streams[i-1][1]]
+            else:
+                inlets = [outlet_streams[i+1][0], outlet_streams[i-1][1]]
+            if i in feeds_by_stage:
+                inlets.extend(feeds_by_stage[i])
+            inlet_streams.append(inlets)
+        stage_location = {0: 'top', n_stages-1: 'bottom'}
         self.vle_stages = [
             VLEStage(
-                ins=[streams[i+1][0], streams[i-1][1]],
-                outs=streams[i],
+                ins=inlet_streams[i],
+                outs=outlet_streams[i],
+                location=stage_location.get(i, 'middle'),
                 alg=alg,
-            ) for i in range(1, n_stages + 1)
+            ) for i in range(n_stages)
         ]
         
 class MultiStageLLE(Unit, tag='e'):
     n_ins = 2
     n_outs = 2
     
+    def prepare(self, ins, outs, n_stages, feed_stages=None):
+        if feed_stages is None: feed_stages = (0, -1)
+        self.feed_stages = feed_stages
+        self.n_stages = n_stages
+        super().prepare(ins, outs)
+        
     def load(self):
         n_stages = self.n_stages
-        streams = [
-            [phn.Stream(), phn.Stream()] # Extract, Raffinate
-            for i in range(n_stages + 2)
+        extract, raffinate = self.outs
+        outlet_streams = [
+            [extract, phn.Stream()], 
+            *[[phn.Stream(), phn.Stream()] # Extract, Raffinate
+              for i in range(n_stages - 2)],
+            [phn.Stream(), raffinate]
         ]
-        self.vle_stages = [
+        feed_stages = [(i if i >= 0 else n_stages + i) for i in self.feed_stages]
+        feeds_by_stage = {i: [] for i in feed_stages}
+        for i, j in zip(feed_stages, self.ins): feeds_by_stage[i].append(j)
+        inlet_streams = []
+        for i in range(n_stages):
+            if i == 0:
+                inlets = [outlet_streams[i+1][0]]
+            elif i == n_stages - 1:
+                inlets = [outlet_streams[i-1][1]]
+            else:
+                inlets = [outlet_streams[i+1][0], outlet_streams[i-1][1]]
+            if i in feeds_by_stage:
+                inlets.extend(feeds_by_stage[i])
+            inlet_streams.append(inlets)
+        self.lle_stages = [
             LLEStage(
-                ins=[streams[i+1][0], streams[i-1][1]],
-                outs=streams[i],
-            ) for i in range(1, n_stages + 1)
+                ins=inlet_streams[i],
+                outs=outlet_streams[i],
+            ) for i in range(n_stages)
         ]
             
 # class Split(Node):
