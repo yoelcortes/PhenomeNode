@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 """
-from .variable import Variable, Variables, variable_index as index
+from .variable import Variable, index as I
 from .varnode import VarNode as Node
-from .context import Inlet, Outlet
 
 __all__ = ('Inlets', 'Outlets')
 
@@ -28,7 +27,7 @@ class Gate:
         elif isa(nodes, Variable):
             self.nodes = [dock(Node(nodes))]
         elif isa(nodes, str):
-            self.nodes = [dock(Node(getattr(index, nodes)))]
+            self.nodes = [dock(Node(getattr(I, nodes)))]
         elif hasattr(nodes, '__iter__'):
             self.nodes = []
             for i in nodes:

@@ -3,29 +3,28 @@
 """
 import phenomenode as phn
 from .phenomenode import PhenomeNode
-from .variable import Variables, Variable, variable_index as index
-from .function import function_index as f
-from .equality import Equality as EQ
-from . unit import Unit
+from .variable import index as I
+from .equation import Equation as EQ
 
 __all__ = (
-    'BulkEnthalpy', 
+    'BulkEnergy', 
     'BulkMaterial',
     'LLE', 'VLE',
-    'BubblePoint',
-    'DewPoint',
     'MinPressure',
     'Equilibrium',
-    'Enthalpy',
+    'Energy',
     'BulkComponents',
     'Composition',
     'EQMaterialBalance',
     'EQEnergyBalance',
     'PressureDrop',
     'Multiply',
+    'Divide',
+    'Substract',
+    'RachfordRice',
 )
 
-class BulkEnthalpy(PhenomeNode):
+class BulkEnergy(PhenomeNode):
     default_ins = 'H'
     default_outs = 'H'
     category = 'energy'
@@ -33,10 +32,10 @@ class BulkEnthalpy(PhenomeNode):
     def equations(self):
         Hs = self.inlet_variables()
         H, = self.outlet_variables()
-        return [EQ(f.sum(*Hs), H)]
+        return [EQ(I.sum(*Hs), H)]
 
 
-class Enthalpy(PhenomeNode):
+class Energy(PhenomeNode):
     default_ins = ['Fcp', 'T', 'P']
     default_outs = 'H'
     category = 'energy'
@@ -44,7 +43,7 @@ class Enthalpy(PhenomeNode):
     def equations(self):
         Fcp, T, P = self.inlet_variables()
         H, = self.outlet_variables()
-        return [EQ(f.enthalpy(Fcp, T, P), H)]
+        return [EQ(H(Fcp, T, P), H)]
     
     
 class BulkMaterial(PhenomeNode):
@@ -55,7 +54,7 @@ class BulkMaterial(PhenomeNode):
     def equations(self):
         Fcps = self.inlet_variables()
         Fc, = self.outlet_variables()
-        return [EQ(f.sum[index.phases](*Fcps), Fc)]
+        return [EQ(I.sum[I.phases](*Fcps), Fc)]
 
 
 class Composition(PhenomeNode):
@@ -76,22 +75,30 @@ class BulkComponents(PhenomeNode):
     def equations(self):
         Fc, = self.inlet_variables()
         F, = self.outlet_variables()
-        return [EQ(f.sum[index.chemicals](Fc), F)]
+        return [EQ(I.sum[I.chemicals](Fc), F)]
 
 
 class EQMaterialBalance(PhenomeNode):
-    default_ins = ['Fc', 'KVc', 'V']
-    default_outs = ['FVc', 'FLc']
+    default_ins = ['Fc', 'KV', 'V']
+    default_outs = ['FLc']
     category = 'material'
     
     def equations(self):
-        Fc, KVc, V = self.inlet_variables()
-        FVc, FLc = self.outlet_variables()
+        Fc, KV, V = self.inlet_variables()
+        FLc, = self.outlet_variables()
         return [
-            EQ((1 - V) * Fc / (V * KVc + (1 - V)), FLc),
-            EQ(Fc - FLc, FVc),
+            EQ((1 - V) * Fc / (V * KV + (1 - V)), FLc),
         ]
     
+
+class Substract(PhenomeNode):
+    
+    def equations(self):
+        L1, L2 = self.inlet_variables()
+        R, = self.outlet_variables()
+        return [
+            EQ(L1 - L2, R)
+        ]
 
 class EQEnergyBalance(PhenomeNode):
     default_ins = ['H', 'hL', 'hV', 'FL']
@@ -105,6 +112,19 @@ class EQEnergyBalance(PhenomeNode):
             EQ((H/FL - hL) / hV, V / (1 - V)),
         ]
     
+
+class RachfordRice(PhenomeNode):
+    default_ins = ['z', 'KV', 'V']
+    default_outs = []
+    category = 'material'
+    
+    def equations(self):
+        z, KV, V = self.inlet_variables()
+        return [
+            EQ(I.sum[I.chemicals](z * (KV - 1) / (1 + V * (KV - 1))), 0),
+        ]
+    
+    
 class Multiply(PhenomeNode):
     
     def equations(self):
@@ -113,42 +133,36 @@ class Multiply(PhenomeNode):
         return [
             EQ(L1 * L2, R)
         ]
+
+class Divide(PhenomeNode):
+    
+    def equations(self):
+        L1, L2 = self.inlet_variables()
+        R, = self.outlet_variables()
+        return [
+            EQ(L1 / L2, R)
+        ]
     
 class VLE(PhenomeNode):
-    default_ins = ['Fc', 'P', 'V', 'T']
-    default_outs = ['KVc']
+    default_ins = ['zL', 'zV', 'T', 'P']
+    default_outs = ['fV', 'fL']
     category = 'equilibrium'
     
     def equations(self):
-        KVc, = self.outlet_variables()
-        return [EQ(f.vle(*self.inlet_variables()), KVc)]
+        x, y, P, T = self.inlet_variables()
+        fV, fL = self.outlet_variables()
+        return [EQ(fL(x, T, P), fV(y, T, P))]
     
 
 class LLE(PhenomeNode):
-    default_ins = ['Fc', 'T', 'P', 'L']
-    default_outs = ['KLc']
+    default_ins = ['Fc', 'T', 'P', 'FLc']
+    default_outs = []
     category = 'equilibrium'
     
     def equations(self):
-        KLc, = self.outlet_variables()
-        return [EQ(f.lle(*self.inlet_variables()), KLc)]
-    
-    
-class BubblePoint(PhenomeNode):
-    default_ins = ['FLc', 'KVc', 'T', 'P']
-    category = 'equilibrium'
-    
-    def equations(self):
-        return [EQ(f.bubble_point(*self.inlet_variables()), 0)]
-    
-    
-class DewPoint(PhenomeNode):
-    default_ins = ['FVc', 'KVc', 'T', 'P']
-    category = 'equilibrium'
-    
-    def equations(self):
-        return [EQ(f.dew_point(*self.inlet_variables()), 0)]
- 
+        variables = self.inlet_variables()
+        return [EQ(I.lle(*variables), variables[-1])]
+
 
 class Equilibrium(PhenomeNode):
     default_ins = ['Fc', 'P', 'T', 'H']
@@ -157,7 +171,7 @@ class Equilibrium(PhenomeNode):
     
     def equations(self):
         Fcp, = self.outlet_variables()
-        return [EQ(f.equilibrium(*self.inlet_variables()), Fcp)]
+        return [EQ(I.equilibrium(*self.inlet_variables()), Fcp)]
   
     
 class PressureDrop(PhenomeNode):
@@ -178,4 +192,4 @@ class MinPressure(PhenomeNode):
     
     def equations(self):
         P, = self.outlet_variables()
-        return [EQ(f.min(*self.inlet_variables()), P)]
+        return [EQ(I.min(*self.inlet_variables()), P)]

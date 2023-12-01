@@ -45,6 +45,7 @@ class DisplayPreferences:
         'graphviz_html_height',
         'cluster',
         'label_format',
+        'tooltip',
     )
     
     def __init__(self):
@@ -71,7 +72,7 @@ class DisplayPreferences:
         self.label_color: str = '#90918e'
         
         #: Color of node clusters.
-        self.depth_colors: list[str] = ['#f98f609f']
+        self.depth_colors: list[str] = ['#ffffffdf', '#d5edf02f']
         
         #: Node fill color.
         self.node_color: str = '#555f69'
@@ -96,6 +97,9 @@ class DisplayPreferences:
         
         #: Format for context subscripts of node labels.
         self.label_format: str = 'n'
+        
+        #: Whether to add tooltip to svg.
+        self.tooltip = False
         
         #: Displayed height of graphviz html diagrams without and with full results.
         self.graphviz_html_height: dict[str, tuple[str, str]] = {
@@ -153,8 +157,8 @@ class DisplayPreferences:
         self._set_mode(stream, label, bg, cluster, node_color, node_label_color,
                        node_periphery_color, fill_cluster, save)
     
-    def light_mode(self, stream='#4e4e4e', label='#4e4e4e', bg='#ffffffff',
-                   cluster=['#d5edf02f', '#ffffffdf'], node_color='white:#CDCDCD', 
+    def light_mode(self, stream='#4e4e4e', label='#4e4e4e', bg='transparent',
+                   cluster=['#ffffffdf', '#d5edf02f'], node_color='white:#CDCDCD', 
                    node_label_color='black', node_periphery_color='#4e4e4e',
                    fill_cluster=True, save=False):
         """Set diagram display colors to light mode."""

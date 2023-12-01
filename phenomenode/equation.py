@@ -2,9 +2,9 @@
 """
 """
 
-__all__ = ('Equality',)
+__all__ = ('Equation',)
 
-class Equality:
+class Equation:
     __slots__ = ('terms')
     
     def __init__(self, *terms):

@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 """
-from .variable import Variables, variable_index#, variable_categories
 from .context import Outlet, Inlet
 from collections import deque
 import phenomenode as phn
@@ -76,10 +75,10 @@ class VarNode:
             'shape': 'circle' if phn.preferences.label_nodes else 'point',
             'style': 'filled',
             'color': color,
-            'tooltip': tooltip,
             'label': tooltip if phn.preferences.label_nodes else '',
             'name': str(hash(self)),
         }
+        if phn.preferences.tooltip: options['tooltip'] = tooltip
         # if 'texlbl' not in options:
         #     options['texlbl'] = self.get_tooltip_string('l')
         return options

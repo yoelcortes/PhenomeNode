@@ -10,7 +10,6 @@ from .registry import *
 from .varnode import *
 from .gate import *
 from .term import *
-from .unit import *
 from .units import *
 from .phenomenode import *
 from .phenomena import *
@@ -18,7 +17,6 @@ from .digraph import *
 from .stream import *
 from .graphics import *
 
-from . import unit
 from . import units
 from . import phenomenode
 from . import phenomena
@@ -44,7 +42,6 @@ __all__ = (
     'digraph',
     *graphics.__all__,
     *stream.__all__,
-    *unit.__all__,
     *units.__all__,
     *term.__all__,
     *varnode.__all__,

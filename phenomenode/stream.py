@@ -10,7 +10,7 @@ This module includes classes and functions concerning Stream objects.
 """
 from __future__ import annotations
 from .varnode import VarNode
-from .variable import variable_index as index
+from .variable import index as I
 
 __all__ = ('Stream',)
         
@@ -39,10 +39,10 @@ class Stream:
     """Create a stream which defines associated variables."""
     
     def __init__(self):
-        self.Fcp = VarNode(index.Fcp)
-        self.T = VarNode(index.T)
-        self.P = VarNode(index.P)
-        self.H = VarNode(index.H)
+        self.Fcp = VarNode(I.Fcp)
+        self.T = VarNode(I.T)
+        self.P = VarNode(I.P)
+        self.H = VarNode(I.H)
         
     @property
     def varnodes(self):

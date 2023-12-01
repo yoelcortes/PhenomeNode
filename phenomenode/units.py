@@ -2,21 +2,19 @@
 """
 """
 import phenomenode as phn
-from .variable import Variables, Variable, variable_index as index
-from .function import function_index as f
-from .equality import Equality as EQ
-from . unit import Unit
+from .variable import index as I
+from .phenomenode import PhenomeNode
 
 __all__ = (
     'Mixer', 
-    # 'Splitter', 
+    'Splitter', 
     'MultiStageVLE',
-    'VLEStage',
+    'StageVLE',
     'MultiStageLLE',
-    'LLEStage', 
+    'StageLLE', 
 )
 
-class Mixer(Unit, tag='x'):
+class Mixer(PhenomeNode, tag='x'):
     n_ins = 2
     n_outs = 1
     def load(self):
@@ -24,8 +22,8 @@ class Mixer(Unit, tag='x'):
         product, = self.outs
         self.min_pressure = phn.MinPressure(ins=[i.P for i in feeds], outs=[product.P])
         self.bulk_material = bulk_material = phn.BulkMaterial(ins=[i.Fcp for i in feeds])
-        self.enthalpies = enthalpies = [phn.Enthalpy(ins=[*i.varnodes]) for i in feeds]
-        self.bulk_enthalpy = bulk_enthalpy = phn.BulkEnthalpy(
+        self.enthalpies = enthalpies = [phn.Energy(ins=[*i.varnodes]) for i in feeds]
+        self.bulk_enthalpy = bulk_enthalpy = phn.BulkEnergy(
             ins=[i.outs[0] for i in enthalpies]
         )
         self.equilibrium = phn.Equilibrium(
@@ -33,12 +31,27 @@ class Mixer(Unit, tag='x'):
             outs=[product.Fcp]
         )
 
-class VLEStage(Unit, tag='s'):
+
+class Splitter(PhenomeNode, tag='θ'):
+    n_ins = 1
+    n_outs = 2
+    def load(self):
+        feed, = self.ins
+        top, bottom = self.outs
+        multiply = phn.Multiply(ins=[I.split, feed.Fcp], outs=[top.Fcp], category='material')
+        self.split = multiply.ins[0]
+        phn.Multiply(ins=[self.split, feed.H], outs=[top.H], category='energy')
+        top.T = bottom.T = feed.T
+        top.P = bottom.P = feed.P
+        phn.Substract(ins=[feed.Fcp, top.Fcp], outs=[bottom.Fcp], category='material')
+        phn.Substract(ins=[feed.H, top.H], outs=[bottom.H], category='energy')
+        
+
+class StageVLE(PhenomeNode, tag='s'):
     n_ins = 2
     n_outs = 2
     
-    def prepare(self, ins, outs, alg=None, location=None):
-        self.alg = alg
+    def prepare(self, ins, outs, location=None):
         vapor, liquid = outs
         if location is None: location = 'middle'
         if location == 'middle':
@@ -54,112 +67,81 @@ class VLEStage(Unit, tag='s'):
         else:
             raise ValueError(f'invalid stage location {location!r}')
         vapor.T = liquid.T
-        vapor.Fcp.variable = index.FVc
-        liquid.Fcp.variable = index.FLc
+        vapor.Fcp.variable = I.FVc
+        liquid.Fcp.variable = I.FLc
         super().prepare(ins, outs)
     
     def load(self):
         feeds = self.ins
         enthalpies = [i.H for i in feeds]
         enthalpies.append('Q')
-        self.bulk_enthalpy = bulk_enthalpy = phn.BulkEnthalpy(
+        self.bulk_enthalpy = bulk_enthalpy = phn.BulkEnergy(
             ins=enthalpies,
         )
         Hbulk, = bulk_enthalpy.outs
         vapor, liquid = self.outs
-        vapor.T = liquid.T
+        T = vapor.T = liquid.T
+        P = vapor.P
         self.pressure_drop = phn.PressureDrop(ins=[vapor.P, None], outs=[liquid.P])
         self.bulk_material = bulk_material = phn.BulkMaterial(ins=[i.Fcp for i in feeds])
         Fc = bulk_material.outs[0]
-        alg = self.alg
-        if alg is None:
-            self.vle = vle = phn.VLE(
-                ins=(Fc, vapor.T, vapor.P, index.V),
-            )
-            Fc, T, P, V = vle.ins
-            KVc, = vle.outs
-            self.vle_material_balance = vle_material_balance = phn.EQMaterialBalance(
-                ins=(Fc, KVc, V), outs=(vapor.Fcp, liquid.Fcp),
-            )
-            FVc, FLc = vle_material_balance.outs
-            
-            self.bulk_vapor = bulk_vapor = phn.BulkComponents(ins=[FVc], outs=['FV'])
-            FV, = bulk_vapor.outs
-            self.bulk_liquid = bulk_liquid = phn.BulkComponents(ins=[FLc], outs=['FL'])
-            FL, = bulk_liquid.outs
-            self.vapor_composition = vapor_composition = phn.Composition(ins=[FVc, FV], outs=[index.zV])
-            zV, = vapor_composition.outs
-            self.liquid_composition = liquid_composition = phn.Composition(ins=[FLc, FL], outs=[index.zL])
-            zL, = liquid_composition.outs
-            self.liquid_enthalpy = liquid_enthalpy = phn.Enthalpy(
-                ins=[zL, T, liquid.P], outs=['hL'],
-            )
-            hL, = liquid_enthalpy.outs
-            self.vapor_enthalpy = vapor_enthalpy = phn.Enthalpy(
-                ins=[zV, T, vapor.P], outs=['hV'],
-            )
-            hV, = vapor_enthalpy.outs
-            self.vle_energy_balance = vle_energy_balance = phn.EQEnergyBalance(
-                ins=[Hbulk, hL, hV, FL], outs=[V]
-            )
-            self.bubble_point = bubble_point = phn.BubblePoint(
-                ins=[zL, T, liquid.P, KVc],
-            )
-            self.dew_point = dew_point = phn.DewPoint(
-                ins=[zV, T, vapor.P, KVc],
-            )
-            mul = phn.Multiply(ins=[hV, FV], outs=[vapor.H], category='energy')
-            mul = phn.Multiply(ins=[hL, FL], outs=[liquid.H], category='energy')
-        elif alg == 'Wang-Henke':
-            self.bubble_point = bubble_point = phn.BubblePoint(
-                ins=['zL', liquid.T, liquid.P, 'KVc'],
-            )
-            zL, T, P, KVc = bubble_point.ins
-            self.vle_material_balance = vle_material_balance = phn.EQMaterialBalance(
-                ins=(Fc, KVc, 'V'), outs=(vapor.Fcp, liquid.Fcp)
-            )
-            Fc, KVc, V = vle_material_balance.ins
-            FVc, FLc = vle_material_balance.outs
-            self.bulk_vapor = bulk_vapor = phn.BulkComponents(ins=[FVc], outs=['FV'])
-            FV, = bulk_vapor.outs
-            self.bulk_liquid = bulk_liquid = phn.BulkComponents(ins=[FLc], outs=['FL'])
-            FL, = bulk_liquid.outs
-            self.vapor_composition = vapor_composition = phn.Composition(ins=[FVc, FV], outs=[index.zV])
-            zV, = vapor_composition.outs
-            self.liquid_composition = liquid_composition = phn.Composition(ins=[FLc, FL], outs=[zL])
-            zL, = liquid_composition.outs
-            self.liquid_enthalpy = liquid_enthalpy = phn.Enthalpy(
-                ins=[zL, T, liquid.P], outs=['hL'],
-            )
-            hL, = liquid_enthalpy.outs
-            self.vapor_enthalpy = vapor_enthalpy = phn.Enthalpy(
-                ins=[zV, T, vapor.P], outs=['hV'],
-            )
-            hV, = vapor_enthalpy.outs
-            self.vle_energy_balance = phn.EQEnergyBalance(
-                ins=[Hbulk, hL, hV, FL], outs=[V]
-            )
-            mul = phn.Multiply(ins=[hV, FV], outs=[vapor.H], category='energy')
-            mul = phn.Multiply(ins=[hL, FL], outs=[liquid.H], category='energy')
-        else:
-            raise RuntimeError(f'unknown algorithm {alg!r}')
+        self.vle_material_balance = vle_material_balance = phn.EQMaterialBalance(
+            ins=(Fc, I.KV, I.V), outs=[liquid.Fcp],
+        )
+        FLc, = vle_material_balance.outs
+        Fc, KV, V = self.vle_material_balance.ins
+        substract = phn.Substract(ins=[Fc, FLc], outs=[vapor.Fcp], category='material')
+        FVc, = substract.outs
+        self.bulk = bulk = phn.BulkComponents(ins=[Fc], outs=['F'])
+        F, = bulk.outs
+        self.bulk_composition = bulk_composition = phn.Composition(ins=[Fc, F], outs=[I.z])
+        z, = bulk_composition.outs
+        self.bulk_vapor = bulk_vapor = phn.BulkComponents(ins=[FVc], outs=['FV'])
+        FV, = bulk_vapor.outs
+        self.bulk_liquid = bulk_liquid = phn.BulkComponents(ins=[FLc], outs=['FL'])
+        FL, = bulk_liquid.outs
+        self.vapor_composition = vapor_composition = phn.Composition(ins=[FVc, FV], outs=[I.zV])
+        zV, = vapor_composition.outs
+        self.liquid_composition = liquid_composition = phn.Composition(ins=[FLc, FL], outs=[I.zL])
+        zL, = liquid_composition.outs
+        self.liquid_enthalpy = liquid_enthalpy = phn.Energy(
+            ins=[zL, T, liquid.P], outs=['hL'],
+        )
+        self.vle = phn.VLE(
+            ins=(zL, zV, T, P),
+        )
+        phn.Divide(ins=[zV, zL], outs=[KV], category='equilibrium')
+        hL, = liquid_enthalpy.outs
+        self.vapor_enthalpy = vapor_enthalpy = phn.Energy(
+            ins=[zV, T, vapor.P], outs=['hV'],
+        )
+        hV, = vapor_enthalpy.outs
+        self.vle_energy_balance = phn.EQEnergyBalance(
+            ins=[Hbulk, hL, hV, FL], outs=[V]
+        )
+        self.rashford_rice = phn.RachfordRice(
+            ins=[z, KV, V]
+        )
+        phn.Multiply(ins=[hV, FV], outs=[vapor.H], category='energy')
+        phn.Multiply(ins=[hL, FL], outs=[liquid.H], category='energy')
+        
         
 
-class LLEStage(Unit, tag='s'):
+class StageLLE(PhenomeNode, tag='s'):
     n_ins = 2
     n_outs = 2
     
-    def prepare(self, ins, outs, alg=None):
+    def prepare(self, ins, outs):
         LIQ, liq = outs
-        LIQ.Fcp.variable = index.FLc
-        liq.Fcp.variable = index.FLc
+        LIQ.Fcp.variable = I.FEc
+        liq.Fcp.variable = I.FRc
         super().prepare(ins, outs)
     
     def load(self):
         feeds = self.ins
         enthalpies = [i.H for i in feeds]
-        enthalpies.append(index.Q)
-        self.bulk_enthalpy = bulk_enthalpy = phn.BulkEnthalpy(
+        enthalpies.append(I.Q)
+        self.bulk_enthalpy = bulk_enthalpy = phn.BulkEnergy(
             ins=enthalpies
         )
         Hbulk, = bulk_enthalpy.outs
@@ -169,51 +151,51 @@ class LLEStage(Unit, tag='s'):
         self.bulk_material = bulk_material = phn.BulkMaterial(ins=[i.Fcp for i in feeds])
         Fc = bulk_material.outs[0]
         self.lle = lle = phn.LLE(
-            ins=(Fc, LIQ.T, LIQ.P, index.L),
+            ins=(Fc, LIQ.T, LIQ.P, liq.Fcp),
         )
-        Fc, T, P, L = lle.ins
-        KLc, = lle.outs
+        Fc, T, P, FRc = lle.ins
         self.lle_material_balance = lle_material_balance = phn.EQMaterialBalance(
-            ins=(Fc, KLc, L), outs=(LIQ.Fcp, liq.Fcp)
+            ins=(Fc, I.KL, I.L), outs=[FRc]
         )
-        FLc, Flc = lle_material_balance.outs
-        self.bulk_LIQUID = bulk_LIQ = phn.BulkComponents(ins=[FLc])
-        FL, = bulk_LIQ.outs
-        self.bulk_liquid = bulk_liq = phn.BulkComponents(ins=[Flc])
-        Fl, = bulk_liq.outs
-        self.LIQUID_composition = LIQUID_composition = phn.Composition(ins=[FLc, FL], outs=[index.zL])
-        zL, = LIQUID_composition.outs
-        self.liquid_composition = liquid_composition = phn.Composition(ins=[Flc, Fl], outs=[index.zL])
-        zl, = liquid_composition.outs
-        self.liquid_enthalpy = liquid_enthalpy = phn.Enthalpy(
-            ins=[zl, T, liq.P], outs=['hL'],
+        Fc, KL, L = lle_material_balance.ins
+        substract = phn.Substract(ins=[Fc, FRc], outs=[LIQ.Fcp], category='material')
+        FEc, = substract.outs
+        self.bulk_LIQUID = bulk_LIQ = phn.BulkComponents(ins=[FEc], outs=[I.FE])
+        FE, = bulk_LIQ.outs
+        self.bulk_liquid = bulk_liq = phn.BulkComponents(ins=[FRc], outs=[I.FR])
+        FR, = bulk_liq.outs
+        self.LIQUID_composition = LIQUID_composition = phn.Composition(ins=[FEc, FE], outs=[I.zE])
+        zE, = LIQUID_composition.outs
+        self.liquid_composition = liquid_composition = phn.Composition(ins=[FRc, FR], outs=[I.zR])
+        zR, = liquid_composition.outs
+        phn.Divide(ins=[zE, zR], outs=[KL], category='equilibrium')
+        self.liquid_enthalpy = liquid_enthalpy = phn.Energy(
+            ins=[zR, T, liq.P], outs=['hR'],
         )
-        hl, = liquid_enthalpy.outs
-        self.LIQUID_enthalpy = LIQUID_enthalpy = phn.Enthalpy(
-            ins=[zL, T, LIQ.P], outs=['hL'],
+        hR, = liquid_enthalpy.outs
+        self.LIQUID_enthalpy = LIQUID_enthalpy = phn.Energy(
+            ins=[zE, T, LIQ.P], outs=['hE'],
         )
-        hL, = LIQUID_enthalpy.outs
-        self.lle_energy_balance = lle_energy_balance = phn.EQEnergyBalance(
-            ins=[Hbulk, hl, hL, Fl], outs=[L]
+        hE, = LIQUID_enthalpy.outs
+        self.lle_energy_balance = phn.EQEnergyBalance(
+            ins=[Hbulk, hR, hE, FE], outs=[L]
         )
-        mul = phn.Multiply(ins=[hL, FL], outs=[LIQ.H], category='energy')
-        mul = phn.Multiply(ins=[hl, Fl], outs=[liq.H], category='energy')
+        phn.Multiply(ins=[hE, FE], outs=[LIQ.H], category='energy')
+        phn.Multiply(ins=[hR, FR], outs=[liq.H], category='energy')
         
         
-class MultiStageVLE(Unit, tag='v'):
+class MultiStageVLE(PhenomeNode, tag='v'):
     n_ins = 2
     n_outs = 2
     
-    def prepare(self, ins, outs, n_stages, alg=None, feed_stages=None):
+    def prepare(self, ins, outs, n_stages, feed_stages=None):
         if feed_stages is None: feed_stages = (0, -1)
-        self.alg = alg
         self.feed_stages = feed_stages
         self.n_stages = n_stages
         super().prepare(ins, outs)
         
     def load(self):
         n_stages = self.n_stages
-        alg = self.alg
         vapor, liquid = self.outs
         outlet_streams = [
             [vapor, phn.Stream()], 
@@ -237,15 +219,14 @@ class MultiStageVLE(Unit, tag='v'):
             inlet_streams.append(inlets)
         stage_location = {0: 'top', n_stages-1: 'bottom'}
         self.vle_stages = [
-            VLEStage(
+            StageVLE(
                 ins=inlet_streams[i],
                 outs=outlet_streams[i],
                 location=stage_location.get(i, 'middle'),
-                alg=alg,
             ) for i in range(n_stages)
         ]
         
-class MultiStageLLE(Unit, tag='e'):
+class MultiStageLLE(PhenomeNode, tag='e'):
     n_ins = 2
     n_outs = 2
     
@@ -279,7 +260,7 @@ class MultiStageLLE(Unit, tag='e'):
                 inlets.extend(feeds_by_stage[i])
             inlet_streams.append(inlets)
         self.lle_stages = [
-            LLEStage(
+            StageLLE(
                 ins=inlet_streams[i],
                 outs=outlet_streams[i],
             ) for i in range(n_stages)
@@ -297,35 +278,35 @@ class MultiStageLLE(Unit, tag='e'):
 #     def equations(self, fmt=None, context=None, inbound=None):
 #         inlet, = self.inlet_variables()
 #         top, bottom = self.outlet_variables()
-#         split = index.split
+#         split = I.split
 #         vars = self.ins[0].variables
-#         if index.Fc in vars:
+#         if I.Fc in vars:
 #             equations = [
 #                 EQ(inlet.Fc * split, top.Fc),
 #                 EQ(inlet.Fc * (1 - split), bottom.Fc)
 #             ]
-#         elif index.Fcp in vars:
+#         elif I.Fcp in vars:
 #             equations = [
 #                 EQ(inlet.Fcp * split, top.Fcp),
 #                 EQ(inlet.Fcp * (1 - split), bottom.Fcp)
 #             ]
-#         if index.H in vars:
+#         if I.H in vars:
 #             equations = [
 #                 EQ(inlet.H * split, top.H),
 #                 EQ(inlet.H * (1 - split), bottom.H)
 #             ]
-#         elif index.T in vars:
+#         elif I.T in vars:
 #             equations = [
 #                 EQ(inlet.T, top.T, bottom.T)
 #             ]
-#         if index.P in vars:
+#         if I.P in vars:
 #             equations = [
 #                 EQ(inlet.P, top.P, bottom.P)
 #             ]
 #         return equations
 
 
-# class LLEStage(Node, tag='z'):
+# class StageLLE(Node, tag='z'):
 #     n_ins = 2
 #     n_outs = 2
     
@@ -341,21 +322,21 @@ class MultiStageLLE(Unit, tag='e'):
 #         filtered = []
 #         if self.Q:
 #             self.ins.append(
-#                 phn.Edge(variables=Variables(index.Q))
+#                 phn.Edge(variables=Variables(I.Q))
 #             )
 #         self.mixer = Mixer(self.ins)
 #         if self.T:
-#             specs.append(index.T)
-#             filtered.append(index.H)
+#             specs.append(I.T)
+#             filtered.append(I.H)
 #         if self.P:
-#             specs.append(index.P)
-#             filtered.append(index.P)
+#             specs.append(I.P)
+#             filtered.append(I.P)
 #         if self.T and self.Q: 
 #             raise ValueError('cannot specify both temperature and duty')
 #         elif not (self.T or self.Q):
 #             raise ValueError('must either temperature or duty')
 #         self.filter = Pylon.filter(self.mixer.outs[0], filtered)
-#         self.distribute = Pylon.distribute(self.filter.outs[0], [index.Fc], 2)
+#         self.distribute = Pylon.distribute(self.filter.outs[0], [I.Fc], 2)
 #         specs = Variables(*specs)
 #         if specs:
 #             self.ins.append(
@@ -365,13 +346,13 @@ class MultiStageLLE(Unit, tag='e'):
 #             self.merge_specs = Pylon.merge([self.distribute.outs[0], self.outlet_specs.outs[0]])
 #             lle_inlet = self.merge_specs.outs[0]
 #         else:
-#             self.outlet_specs = Pylon.distribute(self.distribute.outs[0], [index.P], 3)
+#             self.outlet_specs = Pylon.distribute(self.distribute.outs[0], [I.P], 3)
 #             lle_inlet = self.distribute.outs[0]
 #         self.lle = LLE(lle_inlet)
 #         lle_outlet = self.lle.outs[0]
-#         merge_T = index.T in lle_outlet.variables
+#         merge_T = I.T in lle_outlet.variables
 #         if merge_T:
-#             self.pop = Pylon.pop(lle_outlet, [index.T], 3)
+#             self.pop = Pylon.pop(lle_outlet, [I.T], 3)
 #             lle_outlet = self.pop.outs[0]
 #         self.partition_merge = Pylon.merge([lle_outlet, self.distribute.outs[1]])
 #         self.partition = Partition(self.partition_merge.outs[0])
@@ -389,18 +370,18 @@ class MultiStageLLE(Unit, tag='e'):
 #     def load(self):
 #         inlet, = self.ins
 #         outlet, = self.outs
-#         if index.H in inlet.variables:
-#             outlet.variables = Variables(index.KLc, index.L, index.T)
+#         if I.H in inlet.variables:
+#             outlet.variables = Variables(I.KL, I.L, I.T)
 #         else:
-#             outlet.variables = Variables(index.KLc, index.L)
+#             outlet.variables = Variables(I.KL, I.L)
     
 #     def equations(self):
 #         inlet, = self.inlet_variables()
 #         outlet,  = self.outlet_variables()
 #         if hasattr(inlet, 'H'):
-#             lle = EQ(f.lle(*inlet), outlet.KLc & outlet.L & outlet.T)
+#             lle = EQ(f.lle(*inlet), outlet.KL & outlet.L & outlet.T)
 #         else:
-#             lle = EQ(f.lle(*inlet), outlet.KLc & outlet.L)
+#             lle = EQ(f.lle(*inlet), outlet.KL & outlet.L)
 #         return [lle]
 
 
@@ -411,28 +392,28 @@ class MultiStageLLE(Unit, tag='e'):
 #     def load(self):
 #         inlet, = self.ins
 #         top, bottom = self.outs
-#         if not inlet.variables.difference([index.KVc, index.V, index.T, index.Fc]):
+#         if not inlet.variables.difference([I.KV, I.V, I.T, I.Fc]):
 #             self.vle = True
 #             self.lle = False
-#         elif not inlet.variables.difference([index.KLc, index.L, index.T, index.Fc]):
+#         elif not inlet.variables.difference([I.KL, I.L, I.T, I.Fc]):
 #             self.vle = False
 #             self.lle = True
 #         else:
 #             raise ValueError('inlet variables must be partition coefficients and a phase fraction')
-#         top.variables = bottom.variables = Variables(index.Fcp)
+#         top.variables = bottom.variables = Variables(I.Fcp)
     
 #     def equations(self):
 #         inlet, = self.inlet_variables()
 #         top, bottom = self.outlet_variables()
 #         if self.vle:
 #             return [
-#                 EQ(top.Fcp[index.liquid], inlet.Fc * (1 - inlet.V) / (inlet.V * (inlet.KVc - 1) + 1)),
-#                 EQ(bottom.Fcp[index.liquid], inlet.Fc * inlet.V / (inlet.V * (inlet.KVc - 1) + 1))
+#                 EQ(top.Fcp[I.liquid], inlet.Fc * (1 - inlet.V) / (inlet.V * (inlet.KV - 1) + 1)),
+#                 EQ(bottom.Fcp[I.liquid], inlet.Fc * inlet.V / (inlet.V * (inlet.KV - 1) + 1))
 #             ]
 #         elif self.lle:
 #             return [
-#                 EQ(top.Fcp[index.liquid], inlet.Fc * (1 - inlet.L) / (inlet.L * (inlet.KLc - 1) + 1)),
-#                 EQ(bottom.Fcp[index.liquid], inlet.Fc * inlet.L / (inlet.L * (inlet.KLc - 1) + 1))
+#                 EQ(top.Fcp[I.liquid], inlet.Fc * (1 - inlet.L) / (inlet.L * (inlet.KL - 1) + 1)),
+#                 EQ(bottom.Fcp[I.liquid], inlet.Fc * inlet.L / (inlet.L * (inlet.KL - 1) + 1))
 #             ]
 #         else:
 #             raise RuntimeError('unknown error')

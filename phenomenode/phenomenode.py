@@ -2,12 +2,13 @@
 """
 """
 import phenomenode as phn
-from .variable import Variable, variable_index
+from .variable import Variable, index as I
 from .context import ContextItem, ContextStack, Contexts
 from .gate import Inlets, Outlets
 from .registry import Registry
-from .graphics import graphics
+from .graphics import PhenomeNodeGraphics
 from .utils import AbstractMethod
+from .stream import Stream, as_streams
 from typing import Optional, Mapping, Callable
 
 __all__ = ('PhenomeNode',)
@@ -28,7 +29,9 @@ class DefaultSequence:
 
 
 def default_variables(variables, default_sequence):
-    if variables is None: 
+    if default_sequence is None:
+        return () if variables is None else variables 
+    elif variables is None: 
         return default_sequence.sequence
     else:
         if isinstance(variables, str) or not hasattr(variables, '__iter__'): variables = [variables]
@@ -37,7 +40,7 @@ def default_variables(variables, default_sequence):
             if i is None and d is not None:
                 new_variables.append(d)
             elif isinstance(i, str):
-                new_variables.append(getattr(variable_index, i))
+                new_variables.append(getattr(I, i))
             elif isinstance(i, (phn.Variable, phn.VarNode)) or hasattr(i, 'varnodes'):
                 new_variables.append(i)
             else:
@@ -45,10 +48,10 @@ def default_variables(variables, default_sequence):
         return new_variables
 
 class PhenomeNode(ContextItem, tag='n'):
-    __slots__ = ('ins', 'outs', 'phenomena', 'inbound', 'context', 'ancestry')
+    __slots__ = ('ins', 'outs', 'phenomena', 'inbound', 'context', 'ancestry', 'graphics')
     registry = Registry()
-    default_ins = DefaultSequence()
-    default_outs = DefaultSequence()
+    default_ins = default_outs = None
+    n_ins = n_outs = None
     category = None
     
     def __init_subclass__(cls, tag=None):
@@ -64,37 +67,37 @@ class PhenomeNode(ContextItem, tag='n'):
             cls.tag = tag
             cls.registered_tags.add(tag)
         cls.tickets[cls.tag] = 0
-        if not isinstance(cls.default_ins, DefaultSequence):
+        if cls.default_ins is not None and not isinstance(cls.default_ins, DefaultSequence):
             if isinstance(cls.default_ins, Mapping):
                 cls.default_ins = DefaultSequence(**cls.default_ins)
             elif isinstance(cls.default_ins, str):
-                cls.default_ins = DefaultSequence((getattr(variable_index, cls.default_ins),) )
+                cls.default_ins = DefaultSequence((getattr(I, cls.default_ins),) )
             elif hasattr(cls.default_ins, '__iter__'):
                 cls.default_ins = DefaultSequence(
                     tuple([
-                        getattr(variable_index, i) if isinstance(i, str) else i 
+                        getattr(I, i) if isinstance(i, str) else i 
                         for i in cls.default_ins
                     ])
                 )
-        if not isinstance(cls.default_outs, DefaultSequence):
+        if cls.default_outs is not None and not isinstance(cls.default_outs, DefaultSequence):
             if isinstance(cls.default_outs, Mapping):
                 cls.default_outs = DefaultSequence(**cls.default_outs)
             elif isinstance(cls.default_outs, str):
-                cls.default_outs = DefaultSequence((getattr(variable_index, cls.default_outs),) )
+                cls.default_outs = DefaultSequence((getattr(I, cls.default_outs),) )
             elif hasattr(cls.default_outs, '__iter__'):
                 cls.default_outs = DefaultSequence(
                     tuple([
-                        getattr(variable_index, i) if isinstance(i, str) else i 
+                        getattr(I, i) if isinstance(i, str) else i 
                         for i in cls.default_outs
                     ])
                 )
         Contexts.append(cls)
         
-    @property
-    def graphics(self):
-        return graphics[self.category]
-    
     def __new__(cls, ins=None, outs=None, name=None, **kwargs):
+        if cls.n_ins is not None:
+            ins = [Stream() for i in range(cls.n_ins)] if ins is None else as_streams(ins)
+        if cls.n_outs is not None:
+            outs = [Stream() for i in range(cls.n_outs)] if outs is None else as_streams(outs)
         self = super().__new__(cls, name)
         self.prepare(ins, outs, **kwargs)
         self.registry.open_context_level()
@@ -103,6 +106,7 @@ class PhenomeNode(ContextItem, tag='n'):
         for i in self.nested_phenomena: i.ancestry.append(self)
         self.registry.register(self)
         self.ancestry = [self]
+        if self.category: self.graphics = PhenomeNodeGraphics(self.category)
         return self
     
     def prepare(self, ins, outs, **kwargs):
@@ -159,6 +163,39 @@ class PhenomeNode(ContextItem, tag='n'):
             else:
                 varnodes.append(i)
         return varnodes
+    
+    def proprietary_varnodes(self, filterkey):
+        varnodes = [] 
+        for i in self.outs:
+            if hasattr(i, 'varnodes'):
+                varnodes.extend(i.varnodes)
+            else:
+                varnodes.append(i)
+        for i in self.ins:
+            if hasattr(i, 'varnodes'):
+                if filterkey is None:
+                    for j in i.varnodes:
+                        if j.sources: continue
+                        varnodes.append(j)
+                else:
+                    for j in i.varnodes:
+                        if [i for i in j.sources if not filterkey(i)]: continue
+                        varnodes.append(j)
+            elif filterkey is None:
+                if i.sources: continue
+                else: varnodes.append(i)
+            elif [j for j in i.sources if not filterkey(j)]: 
+                continue
+            else:
+                varnodes.append(i)
+        return varnodes
+    
+    @property
+    def depth(self):
+        if self.phenomena:
+            return 1 + max([i.depth for i in self.phenomena])
+        else:
+            return 0
     
     #: Abstract method for loading phenomena. This method is called after `init`
     load = AbstractMethod
@@ -258,6 +295,7 @@ class PhenomeNode(ContextItem, tag='n'):
                 cluster: Optional[bool]=None,
                 filterkey: Optional[Callable]=None,
                 label_format: Optional[str]=None,
+                depths: Optional[int]=None,
                 **graph_attrs):
         """
         Display a `Graphviz <https://pypi.org/project/graphviz/>`__ diagram
@@ -283,26 +321,9 @@ class PhenomeNode(ContextItem, tag='n'):
             if label_nodes is not None: pref.label_nodes = label_nodes
             if cluster is not None: pref.cluster = cluster
             if label_format is not None: pref.label_format = label_format
-            f = phn.digraph_from_phenomenode(self, filterkey, title=str(self), **graph_attrs)
+            f = phn.digraph_from_phenomenode(self, filterkey, depths, title=str(self), **graph_attrs)
             if display or file:
-                def size(node):
-                    phenomena = node.phenomena
-                    N = len(phenomena)
-                    for n in phenomena: N += size(n)
-                    return N
-                N = size(self)
-                if N < 3:
-                    size_key = 'node'
-                elif N < 8:
-                    size_key = 'network'
-                else:
-                    size_key = 'big-network'
-                height = (
-                    phn.preferences.graphviz_html_height
-                    [size_key]
-                    [phn.preferences.tooltips_full_results]
-                )
-                phn.finalize_digraph(f, file, format, height)
+                phn.finalize_digraph(f, file, format)
             else:
                 return f
     
