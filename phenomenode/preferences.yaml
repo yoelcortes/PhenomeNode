@@ -5,6 +5,7 @@ context_format: n
 depth_colors:
 - '#ffffffdf'
 - '#d5edf02f'
+directed: true
 edge_color: '#4e4e4e'
 fill_cluster: true
 graphviz_format: svg
@@ -18,6 +19,7 @@ graphviz_html_height:
   node: !!python/tuple
   - 225px
   - 400px
+highlight: true
 label_color: '#4e4e4e'
 label_format: n
 label_nodes: false

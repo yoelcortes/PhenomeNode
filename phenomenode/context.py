@@ -85,7 +85,7 @@ class ContextStack:
             return self
         elif isinstance(other, context_types):
             return ContextStack(other, *self)
-        elif isinstance(other, '__iter__'):
+        elif hasattr(other, '__iter__'):
             for i in other:
                 if isinstance(i, context_types): continue
                 raise ValueError('only contexts can be added; not {type(i).__name__} objects')

@@ -46,6 +46,8 @@ class DisplayPreferences:
         'cluster',
         'label_format',
         'tooltip',
+        'highlight',
+        'directed',
     )
     
     def __init__(self):
@@ -100,6 +102,12 @@ class DisplayPreferences:
         
         #: Whether to add tooltip to svg.
         self.tooltip = False
+        
+        #: Whether to highlight variables solved in linearized mass and energy balances.
+        self.highlight = True
+        
+        #: Whether to make arrow heads for directed relationships.
+        self.directed = True
         
         #: Displayed height of graphviz html diagrams without and with full results.
         self.graphviz_html_height: dict[str, tuple[str, str]] = {

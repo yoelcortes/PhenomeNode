@@ -147,7 +147,7 @@ def update_varnode_names(f: Digraph, varnodes, node_names, bridge_nodes):
         if n in node_names: continue
         kwargs = n.vizoptions()
         node_names[n] = kwargs['name']
-        if n in bridge_nodes: kwargs['color'] = '#f3c354'
+        if n in bridge_nodes and n.variable.highlight and n.sources and preferences.highlight: kwargs['color'] = '#f3c354'
         f.node(**kwargs)
 
 def add_connection(f: Digraph, connection, node_names, **edge_options):
@@ -158,12 +158,15 @@ def add_connection(f: Digraph, connection, node_names, **edge_options):
     options = {}
     if preferences.tooltip:
         options['labeltooltip'] = options['edgetooltip'] = phenomenode.get_tooltip_string()
-    color = phenomenode.graphics.color
+    graphics = phenomenode.graphics
+    color = graphics.color
     penwidth = '1.0'
     f.edge(node_names[phenomenode], node_names[varnode], label='', 
            arrowtail='none', 
-           arrowhead='none', headport='c', tailport='c', color=color,
+           arrowhead='normal' if (preferences.directed and graphics.directed and varnode is phenomenode.outs[0]) else 'none', headport='c', 
+           tailport='c', color=color,
            penwidth=penwidth,
+           style='dashed' if graphics.category == 'hidden' else 'solid',
            **options)
 
 def add_connections(f: Digraph, connections, node_names, **edge_options):

@@ -13,6 +13,7 @@ from typing import Optional, Mapping, Callable
 
 __all__ = ('PhenomeNode',)
 
+
 class DefaultSequence:
     __slots__ = ('sequence', 'default')
     
@@ -28,6 +29,17 @@ class DefaultSequence:
         return f"{type(self).__name__}({self.sequence!r}, {self.default!r})"
 
 
+def get_default(name):
+    if isinstance(name, str):
+        return getattr(I, name)
+    elif hasattr(name, '__iter__'):
+        return tuple([get_default(i) for i in name])
+    elif isinstance(name, Variable):
+        return name
+    else:
+        raise ValueError(f"invalid default type '{type(name).__name__}'")
+
+_ok_types = (phn.Variable, phn.VarNode)
 def default_variables(variables, default_sequence):
     if default_sequence is None:
         return () if variables is None else variables 
@@ -41,8 +53,18 @@ def default_variables(variables, default_sequence):
                 new_variables.append(d)
             elif isinstance(i, str):
                 new_variables.append(getattr(I, i))
-            elif isinstance(i, (phn.Variable, phn.VarNode)) or hasattr(i, 'varnodes'):
+            elif isinstance(i, _ok_types):
                 new_variables.append(i)
+            elif hasattr(i, '__iter__'):
+                inner = []
+                new_variables.append(inner)
+                for i, d in zip(i, d):
+                    if i is None and d is not None:
+                        inner.append(d)
+                    elif isinstance(i, str):
+                        inner.append(getattr(I, i))
+                    elif isinstance(i, _ok_types):
+                        inner.append(i)    
             else:
                 raise ValueError('inlets and outlets must be variables or variable nodes')
         return new_variables
@@ -50,9 +72,27 @@ def default_variables(variables, default_sequence):
 class PhenomeNode(ContextItem, tag='n'):
     __slots__ = ('ins', 'outs', 'phenomena', 'inbound', 'context', 'ancestry', 'graphics')
     registry = Registry()
-    default_ins = default_outs = None
-    n_ins = n_outs = None
+    
+    #: Optional[list[str]] Default inlet variables.
+    default_ins = None
+    
+    #: Optional[list[str]] Default outlet variables.
+    default_outs = None
+    
+    #: Optional[int] Number of inlet streams.
+    n_ins = None
+    
+    #: Optional[int] Number of outlet streams.
+    n_outs = None
+    
+    #: [str] Phenomena category(e.g., material, energy, separation, generation, pressure).
     category = None
+    
+    #: [bool] Whether equation should explicitly solve for a variable.
+    directed = None
+    
+    #: [bool] Whether equation is linear.
+    linear = None
     
     def __init_subclass__(cls, tag=None):
         if 'priority' not in cls.__dict__: cls.priority += 1
@@ -74,10 +114,7 @@ class PhenomeNode(ContextItem, tag='n'):
                 cls.default_ins = DefaultSequence((getattr(I, cls.default_ins),) )
             elif hasattr(cls.default_ins, '__iter__'):
                 cls.default_ins = DefaultSequence(
-                    tuple([
-                        getattr(I, i) if isinstance(i, str) else i 
-                        for i in cls.default_ins
-                    ])
+                    tuple([get_default(i) for i in cls.default_ins])
                 )
         if cls.default_outs is not None and not isinstance(cls.default_outs, DefaultSequence):
             if isinstance(cls.default_outs, Mapping):
@@ -86,10 +123,7 @@ class PhenomeNode(ContextItem, tag='n'):
                 cls.default_outs = DefaultSequence((getattr(I, cls.default_outs),) )
             elif hasattr(cls.default_outs, '__iter__'):
                 cls.default_outs = DefaultSequence(
-                    tuple([
-                        getattr(I, i) if isinstance(i, str) else i 
-                        for i in cls.default_outs
-                    ])
+                    tuple([get_default(i) for i in cls.default_outs])
                 )
         Contexts.append(cls)
         
@@ -106,7 +140,7 @@ class PhenomeNode(ContextItem, tag='n'):
         for i in self.nested_phenomena: i.ancestry.append(self)
         self.registry.register(self)
         self.ancestry = [self]
-        if self.category: self.graphics = PhenomeNodeGraphics(self.category)
+        if self.category: self.graphics = PhenomeNodeGraphics(self.category, self.directed, self.linear)
         return self
     
     def prepare(self, ins, outs, **kwargs):
@@ -138,8 +172,8 @@ class PhenomeNode(ContextItem, tag='n'):
     def varnodes(self):
         varnodes = [] 
         for i in self.ins + self.outs:
-            if hasattr(i, 'varnodes'):
-                varnodes.extend(i.varnodes)
+            if hasattr(i, '__iter__'):
+                varnodes.extend(i)
             else:
                 varnodes.append(i)
         return varnodes
@@ -148,8 +182,8 @@ class PhenomeNode(ContextItem, tag='n'):
     def inlet_varnodes(self):
         varnodes = [] 
         for i in self.ins:
-            if hasattr(i, 'varnodes'):
-                varnodes.extend(i.varnodes)
+            if hasattr(i, '__iter__'):
+                varnodes.extend(i)
             else:
                 varnodes.append(i)
         return varnodes
@@ -158,8 +192,8 @@ class PhenomeNode(ContextItem, tag='n'):
     def outlet_varnodes(self):
         varnodes = [] 
         for i in self.outs:
-            if hasattr(i, 'varnodes'):
-                varnodes.extend(i.varnodes)
+            if hasattr(i, '__iter__'):
+                varnodes.extend(i)
             else:
                 varnodes.append(i)
         return varnodes
@@ -167,18 +201,18 @@ class PhenomeNode(ContextItem, tag='n'):
     def proprietary_varnodes(self, filterkey):
         varnodes = [] 
         for i in self.outs:
-            if hasattr(i, 'varnodes'):
-                varnodes.extend(i.varnodes)
+            if hasattr(i, '__iter__'):
+                varnodes.extend(i)
             else:
                 varnodes.append(i)
         for i in self.ins:
-            if hasattr(i, 'varnodes'):
+            if hasattr(i, '__iter__'):
                 if filterkey is None:
-                    for j in i.varnodes:
+                    for j in i:
                         if j.sources: continue
                         varnodes.append(j)
                 else:
-                    for j in i.varnodes:
+                    for j in i:
                         if [i for i in j.sources if not filterkey(i)]: continue
                         varnodes.append(j)
             elif filterkey is None:
@@ -296,6 +330,8 @@ class PhenomeNode(ContextItem, tag='n'):
                 filterkey: Optional[Callable]=None,
                 label_format: Optional[str]=None,
                 depths: Optional[int]=None,
+                highlight: Optional[bool]=None,
+                directed: Optional[bool]=None,
                 **graph_attrs):
         """
         Display a `Graphviz <https://pypi.org/project/graphviz/>`__ diagram
@@ -321,6 +357,37 @@ class PhenomeNode(ContextItem, tag='n'):
             if label_nodes is not None: pref.label_nodes = label_nodes
             if cluster is not None: pref.cluster = cluster
             if label_format is not None: pref.label_format = label_format
+            if highlight is not None: pref.highlight = highlight
+            if directed is not None: pref.directed = directed
+            if isinstance(filterkey, str):
+                filterkey = filterkey.upper()
+                linear = filterkey.startswith('L')
+                if linear: 
+                    filterkey = filterkey[1:]
+                elif filterkey.startswith('NL'):
+                    filterkey = filterkey[2:]
+                    linear = False
+                else:
+                    linear = None
+                directed = filterkey.startswith('D')
+                if directed: 
+                    filterkey = filterkey[1:]
+                elif filterkey.startswith('UD'):
+                    filterkey = filterkey[2:]
+                    directed = False
+                else:
+                    directed = None
+                if filterkey:
+                    category = filterkey.lower()
+                else:
+                    category = None
+                
+                filterkey = lambda x: not (
+                    (category is None or category == x.category) and
+                    (linear is None or linear == x.linear) and
+                    (directed is None or directed == x.directed)
+                )
+            
             f = phn.digraph_from_phenomenode(self, filterkey, depths, title=str(self), **graph_attrs)
             if display or file:
                 phn.finalize_digraph(f, file, format)

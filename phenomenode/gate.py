@@ -35,6 +35,10 @@ class Gate:
                     s = dock(i)
                 elif isa(i, Variable):
                     s = dock(Node(i))
+                elif isa(nodes, str):
+                    s = dock(Node(getattr(I, nodes)))
+                elif hasattr(i, '__iter__'):
+                    s = dock(i)
                 else:
                     raise TypeError(f"{i!r} is not a node")
                 self.nodes.append(s)
@@ -47,12 +51,22 @@ class Gate:
         for i in self.nodes:
             if hasattr(i, 'varnodes'):
                 varnodes.extend(i.varnodes)
+            elif hasattr(i, '__iter__'):
+                varnodes.extend(i)
             else:
                 varnodes.append(i)
         return varnodes
     
     def framed_variables(self):
-        return [i.variable.framed(i.get_full_context()) for i in self.varnodes]
+        variables = []
+        for i in self.nodes:
+            if hasattr(i, 'varnodes'):
+                variables.append([i.variable.framed(i.get_full_context()) for i in i.varnodes])
+            elif hasattr(i, '__iter__'):
+                variables.append([i.variable.framed(i.get_full_context()) for i in i])
+            else:
+                variables.append(i.variable.framed(i.get_full_context()))
+        return variables
     
     def _create_node(self, variable):
         return Node(variable)
@@ -176,6 +190,8 @@ class Inlets(Gate):
     def _dock(self, node):
         if hasattr(node, 'varnodes'):
             for i in node.varnodes: self._dock(i)
+        elif hasattr(node, '__iter__'):
+            for i in node: self._dock(i)
         else:
             node.sinks.appendleft(self.sink)
         return node
@@ -200,6 +216,8 @@ class Outlets(Gate):
     def _dock(self, node): 
         if hasattr(node, 'varnodes'):
             for i in node.varnodes: self._dock(i)
+        elif hasattr(node, '__iter__'):
+            for i in node: self._dock(i)
         else:
             node.sources.appendleft(self.source)
         return node

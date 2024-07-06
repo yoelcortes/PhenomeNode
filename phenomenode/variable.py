@@ -12,11 +12,12 @@ __all__ = (
 )
 
 class Variable(Quantity):
-    __slots__ = ('name', 'context', '_hash')
+    __slots__ = ('name', 'context', '_hash', 'highlight')
     
-    def __init__(self, name, context=None):
+    def __init__(self, name, context=None, highlight=None):
         self.name = name
         self.context = ContextStack() if context is None else context
+        self.highlight = highlight
         
     def __call__(self, *args):
         return FunctionCall(self, args)
@@ -85,6 +86,11 @@ class Variable(Quantity):
     def __str__(self):
         return format(self, 's')
         
+    def copy(self, name=None, context=None):
+        if name is None: name = self.name
+        if context is None: context = self.context
+        return self.__class__(name, context, self.highlight)
+    
     def framed(self, context=None):
         return self.__class__(self.name, self.context + context)
     
@@ -181,6 +187,7 @@ index = Index(
     product=Variable('Π'),
     lle=Variable('lle'),
     equilibrium=Variable('equilibrium'),
+    BubblePoint=Variable('BubblePoint'),
     T = Variable('T'), # Temperature [K]
     P = Variable('P'), # Pressure [Pa]
     H = Variable('H'), # Enthalpy [kJ]
@@ -188,11 +195,17 @@ index = Index(
     G = Variable('G'), # Gibbs free energy [kJ]
     A = Variable('A'), # Helmholtz free energy [kJ]
     V = Variable('V'), # Vapor fraction [by mol]
+    B = Variable('B'), # Boilup ratio [by mol]
     L = Variable('L'), # Extract fraction [by mol]
     F = Variable('F'), # Flow rate [by mol]
     Q = Variable('Q'), # Duty [kJ]
+    DeltaH = Variable('ΔH'), # Energy departure [kJ]
+    E = Variable('E'), # Energy parameter
+    DeltaE = Variable('ΔE', highlight=True), # Energy correction parameter [kJ]
+    dHdE = Variable('δH/δE'), # Energy density [kJ]
     f = Variable('f'), # Fugacity [Pa]
     split = Variable('θ'), # Split fraction
+    Sc = Variable('θ', chemicals), # Separation factor
     chemicals = Chemical.family,
     phases = Phase.family,
     liquid = liquid,
@@ -202,10 +215,10 @@ index = Index(
     gas = gas,
     inlets = inlets,
     outlets = outlets,
-    Fcp = Variable('F', ContextStack(chemicals, phases)),
-    Fc = Variable('F', chemicals),
-    FVc = Variable('F', ContextStack(chemicals, gas)),
-    FLc = Variable('F', ContextStack(chemicals, liquid)),
+    Fcp = Variable('F', ContextStack(chemicals, phases), highlight=True),
+    Fc = Variable('F', chemicals, highlight=True),
+    FVc = Variable('F', ContextStack(chemicals, gas), highlight=True),
+    FLc = Variable('F', ContextStack(chemicals, liquid), highlight=True),
     FL = Variable('F', liquid), # Liquid flow rate [by mol]
     FV = Variable('F', gas), # Vapor flow rate [by mol]
     KV = Variable('K', ContextStack(chemicals, gas)),

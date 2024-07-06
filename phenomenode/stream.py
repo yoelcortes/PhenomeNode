@@ -37,16 +37,33 @@ def as_streams(streams):
 
 class Stream:
     """Create a stream which defines associated variables."""
+    __slots__ = ('Fcp', 'T', 'P', 'dHdE', 'DeltaE')
     
     def __init__(self):
         self.Fcp = VarNode(I.Fcp)
         self.T = VarNode(I.T)
         self.P = VarNode(I.P)
-        self.H = VarNode(I.H)
-        
+        self.dHdE = VarNode(I.dHdE)
+        self.DeltaE = VarNode(I.DeltaE)
+    
+    def define_energy_parameter(self, name):
+        for node in (self.dHdE, self.DeltaE):
+            variable = node.variable
+            node.variable = variable.copy(name=variable.name.replace('E', name))
+    
+    def no_energy_parameter(self):
+        self.dHdE = 0
+        self.DeltaE = 0
+    
     @property
     def varnodes(self):
-        return (*self.__dict__.values(),)
+        if self.DeltaE == 0:
+            return (self.Fcp, self.T, self.P)
+        else:
+            return (self.Fcp, self.T, self.P, self.dHdE, self.DeltaE)
+    
+    def __iter__(self):
+        return iter(self.varnodes)
     
     def __repr__(self):
-        return f"{type(self).__name__}({self.Fcp!r}, {self.T!r}, {self.P!r}))"
+        return f"{type(self).__name__}({self.Fcp!r}, {self.T!r}, {self.P!r})"

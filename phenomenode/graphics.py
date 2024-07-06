@@ -6,7 +6,7 @@ __all__ = ('PhenomeNodeGraphics',)
 class PhenomeNodeGraphics:
     """Create a PhenomeNodeGraphics object that contains specifications for 
     Graphviz node and edge styles."""
-    __slots__ = ('category', 'options', 'color')
+    __slots__ = ('category', 'directed', 'linear', 'options', 'color')
     
     #: [dict] Default node settings
     default_options = {
@@ -23,17 +23,24 @@ class PhenomeNodeGraphics:
     
     #: [dict] Default colors by category
     default_colors = {
-        'material': '#403a48',
-        'transport': '#33cc33',
-        'reaction': '#5fc1cf',
-        'equilibrium': '#a180b8',
-        'energy': '#f1777f',
+        'material': '#a180b8',
+        'hidden': '#bdc2bf',
+        'material-parameter': '#5fc1cf',
+        'energy-parameter': '#f1777f',
+        'energy': '#403a48',
         'pressure': '#8ead3e',
+        
     }
     
-    def __init__(self, category):
-        #: [str] Phenomena category(e.g., material, energy, equilibrium, reaction, transport)
+    def __init__(self, category, directed, linear):
+        #: [str] Phenomena category(e.g., material, energy, separation, generation, pressure).
         self.category = category
+        
+        #: [bool] Whether equation should explicitly solve for a variable.
+        self.directed = directed
+        
+        #: [bool] Whether equation is linear.
+        self.linear = linear
         
         #: [dict] Node settings
         self.options = self.default_options.copy()
@@ -53,5 +60,5 @@ class PhenomeNodeGraphics:
         return options
         
     def __repr__(self): # pragma: no coverage
-        return f'{type(self).__name__}(category={self.category})'
+        return f'{type(self).__name__}(category={self.category}, directed={self.directed}, linear={self.linear})'
 
