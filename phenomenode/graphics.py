@@ -13,11 +13,11 @@ class PhenomeNodeGraphics:
         'shape': 'point',
         'style': 'filled',
         'gradientangle': '0',
-        'width': '0.1',
-        'height': '0.1',
+        'width': '0.2',
+        'height': '0.2',
         'orientation': '0.0',
-        'peripheries': '1',
-        'margin': 'default',
+        'peripheries': '0',
+        'margin': '0',
         'fontname': 'Arial'
     }
     

@@ -10,6 +10,7 @@ __all__ = (
     # 'Splitter', 
     # 'MultiStageVLE',
     'StageVLE',
+    'AggregatedStageVLE',
     'MultiStageVLE',
     # 'MultiStageLLE',
     # 'StageLLE', 
@@ -125,6 +126,67 @@ class StageVLE(PhenomeNode, tag='s'):
             ins=[vapor.DeltaE, B],
         )
         
+
+class AggregatedStageVLE(PhenomeNode, tag='s'):
+    n_ins = 1
+    n_outs = 2
+    
+    def prepare(self, ins, outs, location=None):
+        vapor, liquid = outs
+        vapor.T = liquid.T
+        vapor.Fcp.variable = I.FVc
+        liquid.Fcp.variable = I.FLc  
+        vapor.define_energy_parameter('B')
+        liquid.no_energy_parameter()
+        super().prepare(ins, outs)
+    
+    def load(self):
+        feed, = ins = self.ins
+        vapor, liquid = outs = self.outs
+        self.inlet_energies = [phn.Energy(ins=[i.Fcp, i.T, i.P]) for i in ins]
+        self.outlet_energies = [phn.Energy(ins=[i.Fcp, i.T, i.P]) for i in outs]
+        inlet_enthalpies = [i.outs[0] for i in self.inlet_energies]
+        outlet_enthalpies = [i.outs[0] for i in self.outlet_energies]
+        inlet_enthalpies.append('Q')
+        self.energy_departure = phn.EnergyDeparture(
+            ins=inlet_enthalpies, outs=[I.DeltaH, *outlet_enthalpies],
+        )
+        DeltaH = self.energy_departure.outs[0]
+        self.bulk_liquid = bulk_liquid = phn.BulkMaterial(ins=[liquid.Fcp], outs=['FL'])
+        FL, = bulk_liquid.outs
+        self.liquid_composition = liquid_composition = phn.Composition(ins=[liquid.Fcp, FL], outs=[I.zL])
+        zL, = liquid_composition.outs
+        self.ufunc = phn.Function(ins=[(i.Fcp, i.T, i.P) for i in ins], outs=[I.KV, vapor.T, liquid.T, I.DeltaP, I.DeltaP])
+        K, TV, TL, DPV, DPL = self.ufunc.outs
+        self.liquid_pressure_balance = phn.PressureBalance(ins=[feed.P, DPL], outs=[liquid.P])
+        self.vapor_pressure_balance = phn.PressureBalance(ins=[feed.P, DPV], outs=[vapor.P])
+        self.separation_factor = phn.SeparationFactorVLE(ins=[K, I.B], outs=[I.Sc])
+        B = self.separation_factor.ins[1]
+        Sc = self.separation_factor.outs[0]
+        self.bulk_vapor = bulk_vapor = phn.BulkMaterial(ins=[vapor.Fcp], outs=['FV'], category='energy-parameter')
+        self.bulk_liquid_energy = bulk_liquid_energy = phn.BulkMaterial(ins=[liquid.Fcp], outs=['FL'], category='energy-parameter')
+        FL, = bulk_liquid_energy.outs
+        self.specific_gas_enthalpy = phn.Divide(
+            ins=[outlet_enthalpies[0], bulk_vapor.outs[0]], 
+            outs=[I.hV],
+            category='energy-parameter'
+        )
+        hV = self.specific_gas_enthalpy.outs[0]
+        self.energy_density = phn.EnergyDensityVLE(ins=[hV, FL], outs=[vapor.dHdE])
+        self.mass_conservation = phn.MassConservation(
+            ins=[i.Fcp for i in ins],
+            outs=[i.Fcp for i in outs]
+        )
+        self.separation_process = phn.SeparationProcess(
+            ins=[Sc, liquid.Fcp], outs=[vapor.Fcp]
+        )
+        self.energy_conservation = phn.EnergyConservation(
+            ins=[[i.DeltaE for i in ins], [i.dHdE for i in ins]],
+            outs=[vapor.DeltaE, [vapor.dHdE], DeltaH]
+        )
+        self.energy_parameter_update = phn.EnergyParameterUpdate(
+            ins=[vapor.DeltaE, B],
+        )
 
 # class StageLLE(PhenomeNode, tag='s'):
 #     n_ins = 2

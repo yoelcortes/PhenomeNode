@@ -13,30 +13,17 @@ __all__ = ('digraph_from_phenomenode',
            'display_digraph',
            'save_digraph')
 
-edge_node = dict(
-    fillcolor='#55a8b5',
-    fontcolor='white', 
-    style='filled', 
-    orientation='0',
-    width='0.6', 
-    height='0.6', 
-    color='#90918e', 
-    margin='0',
-    peripheries='1',
-    fontname="Arial",
-)
-
 preferences = phn.preferences
 
 def blank_digraph(format='svg', maxiter='10000000000000000000', 
-                  Damping='0.995', K='0.5', **graph_attrs):
+                  Damping='0.99', K='0.5', **graph_attrs):
     # Create a digraph and set direction left to right
     f = Digraph(format=format)
     f.attr(rankdir='LR', maxiter=maxiter, Damping=Damping, K=K,
            penwidth='0', color='none', bgcolor=preferences.background_color,
            fontcolor=preferences.label_color, fontname="Arial",
            labeljust='l', labelloc='t', fontsize='8', constraint='false',
-           nodesep='0.1', ranksep='0.1', 
+           nodesep='0.02', ranksep='0.02', 
            **graph_attrs)
     return f
 
@@ -160,7 +147,7 @@ def add_connection(f: Digraph, connection, node_names, **edge_options):
         options['labeltooltip'] = options['edgetooltip'] = phenomenode.get_tooltip_string()
     graphics = phenomenode.graphics
     color = graphics.color
-    penwidth = '1.0'
+    penwidth = '2.0'
     f.edge(node_names[phenomenode], node_names[varnode], label='', 
            arrowtail='none', 
            arrowhead='normal' if (preferences.directed and graphics.directed and varnode is phenomenode.outs[0]) else 'none', headport='c', 
@@ -172,7 +159,7 @@ def add_connection(f: Digraph, connection, node_names, **edge_options):
 def add_connections(f: Digraph, connections, node_names, **edge_options):
     # Set attributes for graph and edges
     f.attr('graph', fontname="Arial", layout='fdp', splines='curved', concentrate='true',
-           outputorder='edgesfirst', nodesep='0.1', ranksep='0.1', maxiter='1000000',
+           outputorder='edgesfirst', nodesep='0.02', ranksep='0.02', maxiter='1000000',
            overlap='false')
     f.attr('edge', dir='foward', fontname='Arial')
     for connection in connections:

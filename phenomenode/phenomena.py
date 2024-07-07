@@ -35,6 +35,8 @@ __all__ = (
     'Multiply',
     'Divide',
     'Substract',
+    
+    'Function',
 )
 
 # %% Linear equations
@@ -235,6 +237,23 @@ class EnergyDensityVLE(PhenomeNode):
         return [
             EQ(dHdE, hV * FL),
         ]
+
+# %% Nonlinear phenomenological equations - Aggregation
+
+class Function(PhenomeNode):
+    default_ins = [[]]
+    default_outs = []
+    category = 'material-parameter'
+    directed = True
+    linear = False
+    
+    def equations(self):
+        ins = self.inlet_variables()
+        outs  = self.outlet_variables()
+        out = outs[0]
+        for i in outs[1:]: out = out & i
+        return [EQ(out, I.function(*ins))]
+
 
 # %% Nonlinear phenomenological equations - LLE
 

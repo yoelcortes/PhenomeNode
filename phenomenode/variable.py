@@ -188,6 +188,7 @@ index = Index(
     lle=Variable('lle'),
     equilibrium=Variable('equilibrium'),
     BubblePoint=Variable('BubblePoint'),
+    function=Variable('function'), # Arbitrary function
     T = Variable('T'), # Temperature [K]
     P = Variable('P'), # Pressure [Pa]
     H = Variable('H'), # Enthalpy [kJ]

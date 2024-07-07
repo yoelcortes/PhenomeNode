@@ -65,10 +65,11 @@ class VarNode:
         # color = phn.PhenomeNodeGraphics.colors[variable_categories[self.variable.name]]
         options = {
             'gradientangle': '0',
-            'width': '0.5' if phn.preferences.label_nodes else '0.1',
-            'height': '0.5' if phn.preferences.label_nodes else '0.1',
+            'width': '0.5' if phn.preferences.label_nodes else '0.2',
+            'height': '0.5' if phn.preferences.label_nodes else '0.2',
             'orientation': '0.0',
             'peripheries': '1',
+            'penwidth': '2',
             'margin': '0',
             'fontname': 'Arial',
             'fillcolor': 'none',
