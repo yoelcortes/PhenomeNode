@@ -192,7 +192,7 @@ class Inlets(Gate):
             for i in node.varnodes: self._dock(i)
         elif hasattr(node, '__iter__'):
             for i in node: self._dock(i)
-        else:
+        elif not (node.sinks and node.sinks[-1] is self.sink):
             node.sinks.appendleft(self.sink)
         return node
 
@@ -218,7 +218,7 @@ class Outlets(Gate):
             for i in node.varnodes: self._dock(i)
         elif hasattr(node, '__iter__'):
             for i in node: self._dock(i)
-        else:
+        elif not (node.sources and node.sources[-1] is self.source):
             node.sources.appendleft(self.source)
         return node
     

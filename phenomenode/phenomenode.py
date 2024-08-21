@@ -33,7 +33,7 @@ def get_default(name):
     if isinstance(name, str):
         return getattr(I, name)
     elif hasattr(name, '__iter__'):
-        return tuple([get_default(i) for i in name])
+        return DefaultSequence(tuple([get_default(i) for i in name]))
     elif isinstance(name, Variable):
         return name
     else:
@@ -58,19 +58,25 @@ def default_variables(variables, default_sequence):
             elif hasattr(i, '__iter__'):
                 inner = []
                 new_variables.append(inner)
-                for i, d in zip(i, d):
-                    if i is None and d is not None:
-                        inner.append(d)
-                    elif isinstance(i, str):
-                        inner.append(getattr(I, i))
-                    elif isinstance(i, _ok_types):
-                        inner.append(i)    
+                if d is None:
+                    for j in i:
+                        if isinstance(j, str):
+                            inner.append(getattr(I, j))
+                        elif isinstance(j, _ok_types):
+                            inner.append(j)
+                else:
+                    for j, d in zip(i, d):
+                        if j is None and d is not None:
+                            inner.append(d)
+                        elif isinstance(j, str):
+                            inner.append(getattr(I, j))
+                        elif isinstance(j, _ok_types):
+                            inner.append(j)    
             else:
                 raise ValueError('inlets and outlets must be variables or variable nodes')
         return new_variables
 
 class PhenomeNode(ContextItem, tag='n'):
-    __slots__ = ('ins', 'outs', 'phenomena', 'inbound', 'context', 'ancestry', 'graphics')
     registry = Registry()
     
     #: Optional[list[str]] Default inlet variables.
@@ -85,8 +91,11 @@ class PhenomeNode(ContextItem, tag='n'):
     #: Optional[int] Number of outlet streams.
     n_outs = None
     
-    #: [str] Phenomena category(e.g., material, energy, separation, generation, pressure).
+    #: [str] Phenomena category (e.g., material, energy, material-phenomena, energy-phenomena).
     category = None
+    
+    #: [str] Phenomena subcategory (e.g., lle, lle-material, lle-phenomena, vle).
+    subcategory = None
     
     #: [bool] Whether equation should explicitly solve for a variable.
     directed = None
@@ -127,7 +136,7 @@ class PhenomeNode(ContextItem, tag='n'):
                 )
         Contexts.append(cls)
         
-    def __new__(cls, ins=None, outs=None, name=None, **kwargs):
+    def __new__(cls, ins=None, outs=None, name=None, category=None, subcategory=None, **kwargs):
         if cls.n_ins is not None:
             ins = [Stream() for i in range(cls.n_ins)] if ins is None else as_streams(ins)
         if cls.n_outs is not None:
@@ -140,7 +149,9 @@ class PhenomeNode(ContextItem, tag='n'):
         for i in self.nested_phenomena: i.ancestry.append(self)
         self.registry.register(self)
         self.ancestry = [self]
-        if self.category: self.graphics = PhenomeNodeGraphics(self.category, self.directed, self.linear)
+        if category is not None: self.category = category
+        if subcategory is not None: self.subcategory = subcategory
+        if self.category: self.graphics = PhenomeNodeGraphics(self.category, self.subcategory, self.directed, self.linear)
         return self
     
     def prepare(self, ins, outs, **kwargs):
@@ -329,9 +340,12 @@ class PhenomeNode(ContextItem, tag='n'):
                 cluster: Optional[bool]=None,
                 filterkey: Optional[Callable]=None,
                 label_format: Optional[str]=None,
-                depths: Optional[int]=None,
                 highlight: Optional[bool]=None,
                 directed: Optional[bool]=None,
+                subcategory: Optional[bool]=None,
+                overlap: Optional[bool]=None,
+                outputs_only: Optional[bool]=None,
+                exclude_subcategory: Optional[bool]=None,
                 **graph_attrs):
         """
         Display a `Graphviz <https://pypi.org/project/graphviz/>`__ diagram
@@ -359,8 +373,10 @@ class PhenomeNode(ContextItem, tag='n'):
             if label_format is not None: pref.label_format = label_format
             if highlight is not None: pref.highlight = highlight
             if directed is not None: pref.directed = directed
+            if subcategory is not None: pref.subcategory = subcategory 
+            if overlap is not None: pref.overlap = overlap
+            if outputs_only is not None: pref.outputs_only = outputs_only
             if isinstance(filterkey, str):
-                filterkey = filterkey.upper()
                 linear = filterkey.startswith('L')
                 if linear: 
                     filterkey = filterkey[1:]
@@ -378,17 +394,16 @@ class PhenomeNode(ContextItem, tag='n'):
                 else:
                     directed = None
                 if filterkey:
-                    category = filterkey.lower()
+                    category = set(filterkey.lower().split('+'))
                 else:
                     category = None
-                
                 filterkey = lambda x: not (
-                    (category is None or category == x.category) and
+                    (category is None or x.category in category or x.subcategory in category) and
                     (linear is None or linear == x.linear) and
-                    (directed is None or directed == x.directed)
+                    (directed is None or directed == x.directed) and
+                    (exclude_subcategory is None or x.subcategory is None)
                 )
-            
-            f = phn.digraph_from_phenomenode(self, filterkey, depths, title=str(self), **graph_attrs)
+            f = phn.digraph_from_phenomenode(self, filterkey, title=str(self), **graph_attrs)
             if display or file:
                 phn.finalize_digraph(f, file, format)
             else:

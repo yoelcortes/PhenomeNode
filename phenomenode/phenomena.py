@@ -12,7 +12,7 @@ __all__ = (
     'SeparationProcess',
     'Splitting',
     # Energy correction equation
-    'EnergyConservation',
+    'EnergyCorrection',
     # Pressure drops
     'PressureBalance',
     # Abstract nonlinear equations
@@ -21,11 +21,19 @@ __all__ = (
     # 'Splitting',
     # 'EnergyContent',
     
+    'PseudoEquilibrium',
     'BubblePoint',
     'SeparationFactorVLE',
-    'EnergyDensityVLE',
+    'VaporEnergyDensity',
     
+    'LLECriteria',
+    'SeparationFactorLLE',
+    'LiquidEnergyDensity',
+    
+    'RashfordRice',
+    'PartitionCoefficient',
     'EnergyParameterUpdate',
+    'ParameterUpdate',
     'BulkMaterial',
     'MinPressure',
     'EnergyDeparture',
@@ -80,7 +88,7 @@ class Splitting(PhenomeNode):
         return [EQ(split * Fout - I.sum(Fouts), 0)]
     
     
-class EnergyConservation(PhenomeNode):
+class EnergyCorrection(PhenomeNode):
     default_ins = [['DeltaE'], ['dHdE']]
     default_outs = ['DeltaE', ['dHdE'], 'DeltaH']
     category = 'energy'
@@ -108,6 +116,19 @@ class PressureBalance(PhenomeNode):
 
 # %% General nonlinear phenomenological equations
 
+class ParameterUpdate(PhenomeNode):
+    default_ins = [I.KL]
+    default_outs = [I.KL]
+    category = 'hidden'
+    directed = False
+    linear = True
+    
+    def equations(self):
+        KL_in, = self.inlet_variables()
+        KL_out, = self.outlet_variables()
+        return [EQ(KL_in, KL_out)]
+
+
 class EnergyParameterUpdate(PhenomeNode):
     default_ins = [I.DeltaE, I.E]
     default_outs = []
@@ -123,7 +144,7 @@ class EnergyParameterUpdate(PhenomeNode):
 class EnergyDeparture(PhenomeNode):
     default_ins = ['H']
     default_outs = [I.DeltaH, 'H']
-    category = 'energy-parameter'
+    category = 'energy-phenomena'
     directed = True
     linear = True
     
@@ -136,7 +157,7 @@ class EnergyDeparture(PhenomeNode):
 class Energy(PhenomeNode):
     default_ins = ['Fcp', 'T', 'P']
     default_outs = 'H'
-    category = 'energy-parameter'
+    category = 'energy-phenomena'
     directed = True
     
     def equations(self):
@@ -148,7 +169,7 @@ class Energy(PhenomeNode):
 class BulkComponents(PhenomeNode):
     default_ins = 'Fcp'
     default_outs = 'Fc'
-    category = 'material-parameter'
+    category = 'material-phenomena'
     directed = True
     linear = True
     
@@ -161,7 +182,7 @@ class BulkComponents(PhenomeNode):
 class Composition(PhenomeNode):
     default_ins = ['Fc', 'F']
     default_outs = ['z']
-    category = 'material-parameter'
+    category = 'material-phenomena'
     directed = True
     
     def equations(self):
@@ -173,7 +194,7 @@ class Composition(PhenomeNode):
 class BulkMaterial(PhenomeNode):
     default_ins = 'Fc'
     default_outs = 'F'
-    category = 'material-parameter'
+    category = 'material-phenomena'
     directed = True
     linear = True
     
@@ -184,14 +205,27 @@ class BulkMaterial(PhenomeNode):
 
 
 class RashfordRice(PhenomeNode):
-    default_ins = ['z', 'KV', 'V']
+    default_ins = ['z', 'KL', 'L']
     default_outs = []
-    category = 'material-parameter'
+    category = 'material-phenomena'
+    subcategory = 'lle-phenomena'
     
     def equations(self):
         z, KV, V = self.inlet_variables()
         return [
             EQ(I.sum[I.chemicals](z * (KV - 1) / (1 + V * (KV - 1))), 0),
+        ]
+
+class PartitionCoefficient(PhenomeNode):
+    default_ins = ['z', 'zE', 'L']
+    default_outs = ['KL']
+    category = 'material-phenomena'
+    
+    def equations(self):
+        z, zE, L = self.inlet_variables()
+        K = self.outlet_variables()
+        return [
+            EQ(K, zE / (z - zE * L)),
         ]
 
 
@@ -200,7 +234,8 @@ class RashfordRice(PhenomeNode):
 class BubblePoint(PhenomeNode):
     default_ins = ['zL', 'P']
     default_outs = ['KV', 'T']
-    category = 'material-parameter'
+    category = 'material-phenomena'
+    subcategory = 'vle'
     directed = True
     
     def equations(self):
@@ -213,7 +248,7 @@ class BubblePoint(PhenomeNode):
 class SeparationFactorVLE(PhenomeNode):
     default_ins = ['B', 'KV']
     default_outs = ['Sc']
-    category = 'material-parameter'
+    category = 'material-phenomena'
     directed = True
     linear = True
     
@@ -224,10 +259,10 @@ class SeparationFactorVLE(PhenomeNode):
             EQ(Sc, B * K),
         ]
 
-class EnergyDensityVLE(PhenomeNode):
+class VaporEnergyDensity(PhenomeNode):
     default_ins = ['hV', 'FL']
     default_outs = ['dHdE']
-    category = 'energy-parameter'
+    category = 'energy-phenomena'
     directed = True
     linear = True
     
@@ -243,7 +278,7 @@ class EnergyDensityVLE(PhenomeNode):
 class Function(PhenomeNode):
     default_ins = [[]]
     default_outs = []
-    category = 'material-parameter'
+    category = 'material-phenomena'
     directed = True
     linear = False
     
@@ -256,6 +291,64 @@ class Function(PhenomeNode):
 
 
 # %% Nonlinear phenomenological equations - LLE
+
+class PseudoEquilibrium(PhenomeNode):
+    category = 'material-phenomena'
+    subcategory = 'lle'
+    default_ins = ['gammaR', 'KL', 'zE']
+    default_outs = ['gammaR', 'KL']
+    directed = True
+    linear = False
+    
+    def equations(self):
+        ins = self.inlet_variables()
+        gammaR, KL = self.outlet_variables()
+        return [
+            EQ(KL & gammaR, I.PseudoEquilibrium(*ins)),
+        ]
+    
+
+class LLECriteria(PhenomeNode):
+    default_ins = ['z', 'T', 'P']
+    default_outs = ['zE', 'L']
+    category = 'material-phenomena'
+    directed = True
+    linear = False
+    
+    def equations(self):
+        z, T, P = self.inlet_variables()
+        zE, L = self.outlet_variables()
+        return [
+            EQ(zE & L, I.min(I.G(z, zE, L, T, P))),
+        ]
+
+class SeparationFactorLLE(PhenomeNode):
+    default_ins = ['L', 'KV']
+    default_outs = ['Sc']
+    category = 'material-phenomena'
+    directed = True
+    linear = True
+    
+    def equations(self):
+        L, K = self.inlet_variables()
+        Sc, = self.outlet_variables()
+        return [
+            EQ(Sc, L * K),
+        ]
+
+class LiquidEnergyDensity(PhenomeNode):
+    default_ins = ['FLc', 'T', 'P']
+    default_outs = ['dHdE']
+    category = 'energy-phenomena'
+    directed = True
+    linear = True
+    
+    def equations(self):
+        FLc, T, P = self.inlet_variables()
+        dHdE, = self.outlet_variables()
+        return [
+            EQ(dHdE, I.C(FLc, T, P)),
+        ]
 
 # %% Nonlinear phenomenological equations - Compressor
 

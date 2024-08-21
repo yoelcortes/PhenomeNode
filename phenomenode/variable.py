@@ -188,6 +188,7 @@ index = Index(
     lle=Variable('lle'),
     equilibrium=Variable('equilibrium'),
     BubblePoint=Variable('BubblePoint'),
+    PseudoEquilibrium=Variable('PseudoEquilibrium'),
     function=Variable('function'), # Arbitrary function
     T = Variable('T'), # Temperature [K]
     P = Variable('P'), # Pressure [Pa]
@@ -199,6 +200,7 @@ index = Index(
     B = Variable('B'), # Boilup ratio [by mol]
     L = Variable('L'), # Extract fraction [by mol]
     F = Variable('F'), # Flow rate [by mol]
+    C = Variable('C'), # Capacity flow rate [kJ/K]
     Q = Variable('Q'), # Duty [kJ]
     DeltaH = Variable('ΔH'), # Energy departure [kJ]
     E = Variable('E'), # Energy parameter
@@ -226,6 +228,9 @@ index = Index(
     KL = Variable('K', ContextStack(chemicals, liquid)),
     hV = Variable('h', gas),
     hL = Variable('h', liquid),
+    gamma = Variable('γ', chemicals), # Activity coefficient 
+    gammaR = Variable('γ', ContextStack(chemicals, raffinate)), # Activity coefficient 
+    gammaE = Variable('γ', ContextStack(chemicals, extract)), # Activity coefficient 
     DeltaP = Variable('ΔP'),
     z = Variable('z', chemicals), # Bulk composition [by mol]
     zV = Variable('z', ContextStack(chemicals, gas)), # Vapor composition [by mol]
@@ -238,8 +243,8 @@ index = Index(
     zR = Variable('z', ContextStack(chemicals, raffinate)), # Raffinate composition [by mol]
     fE = Variable('f', ContextStack(chemicals, extract)), # Extract fugacity [Pa] 
     fR = Variable('f', ContextStack(chemicals, raffinate)), # Raffinate fugacity [Pa] 
-    FEc = Variable('F', ContextStack(chemicals, extract)),
-    FRc = Variable('F', ContextStack(chemicals, raffinate)),
+    FEc = Variable('F', ContextStack(chemicals, extract), highlight=True),
+    FRc = Variable('F', ContextStack(chemicals, raffinate), highlight=True),
     FE = Variable('F', extract), # Extract flow rate [by mol]
     FR = Variable('F', raffinate), # Raffinate flow rate [by mol]
 )

@@ -48,11 +48,14 @@ class DisplayPreferences:
         'tooltip',
         'highlight',
         'directed',
+        'subcategory',
+        'overlap',
+        'outputs_only',
     )
     
     def __init__(self):
         #: Whether to cluster phenomena.
-        self.cluster = True
+        self.cluster = False
         
         #: Whether to label the variable nodes in process diagrams.
         self.label_nodes: bool = False
@@ -108,6 +111,15 @@ class DisplayPreferences:
         
         #: Whether to make arrow heads for directed relationships.
         self.directed = True
+        
+        #: Whether to color nodes by subcategory.
+        self.subcategory = False
+        
+        #: Graphviz overlap parameter.
+        self.overlap = 'compress'
+        
+        #: Whether to show only output variables from subgraphs
+        self.outputs_only = True
         
         #: Displayed height of graphviz html diagrams without and with full results.
         self.graphviz_html_height: dict[str, tuple[str, str]] = {

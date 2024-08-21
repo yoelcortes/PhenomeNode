@@ -1,6 +1,6 @@
 autodisplay: true
 background_color: transparent
-cluster: true
+cluster: false
 context_format: n
 depth_colors:
 - '#ffffffdf'
@@ -26,6 +26,9 @@ label_nodes: false
 node_color: white:#CDCDCD
 node_label_color: black
 node_periphery_color: '#4e4e4e'
+outputs_only: true
+overlap: compress
 raise_exception: false
+subcategory: false
 tooltip: false
 tooltips_full_results: false
