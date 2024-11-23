@@ -171,7 +171,7 @@ def get_varnode_names(f: Digraph, varnodes, bridge_nodes):
     for n in varnodes:
         kwargs = n.vizoptions()
         node_names[n] = kwargs['name']
-        if n in bridge_nodes and n.variable.highlight and n.sources and preferences.highlight: kwargs['color'] = '#f3c354'
+        # if n in bridge_nodes and n.variable.highlight and n.sources and preferences.highlight: kwargs['color'] = '#f3c354'
         f.node(**kwargs)
     return node_names
 

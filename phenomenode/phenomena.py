@@ -89,15 +89,15 @@ class Splitting(PhenomeNode):
     
     
 class EnergyCorrection(PhenomeNode):
-    default_ins = [['DeltaE'], ['dHdE']]
-    default_outs = ['DeltaE', ['dHdE'], 'DeltaH']
+    default_ins = [['DeltaE'], ['dHdE'], ['dHdE'], 'DeltaH']
+    default_outs = ['DeltaE']
     category = 'energy'
     directed = False
     linear = True
     
     def equations(self):
-        DeltaEs_in, dHdE_in, = self.inlet_variables()
-        DeltaE_out, dHdE_out, DeltaH  = self.outlet_variables()
+        DeltaEs_in, dHdE_in, dHdE_out, DeltaH = self.inlet_variables()
+        DeltaE_out,  = self.outlet_variables()
         return [EQ(DeltaE_out * I.sum(dHdE_out) - I.sum([i*j for i, j in zip(DeltaEs_in, dHdE_in)]), DeltaH)]
 
 

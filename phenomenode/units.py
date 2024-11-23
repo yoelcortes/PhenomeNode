@@ -45,8 +45,8 @@ class Mixer(PhenomeNode, tag='x'): # Single phase
             outs=[i.Fcp for i in outs],
         )
         self.energy_conservation = phn.EnergyCorrection(
-            ins=[[i.DeltaE for i in ins], [i.dHdE for i in ins]],
-            outs=[product.DeltaE, dHdEs, DeltaH]
+            ins=[[i.DeltaE for i in ins], [i.dHdE for i in ins], dHdEs, DeltaH],
+            outs=[product.DeltaE]
         )
         self.energy_parameter_update = phn.EnergyParameterUpdate(
             ins=[product.DeltaE, product.T],
@@ -187,8 +187,8 @@ class StageVLE(PhenomeNode, tag='s'):
         )
         if adiabatic:
             self.energy_conservation = phn.EnergyCorrection(
-                ins=[[i.DeltaE for i in ins], [i.dHdE for i in ins]],
-                outs=[vapor.DeltaE, [vapor.dHdE], DeltaH]
+                ins=[[i.DeltaE for i in ins], [i.dHdE for i in ins], [vapor.dHdE], DeltaH],
+                outs=[vapor.DeltaE]
             )
             self.energy_parameter_update = phn.EnergyParameterUpdate(
                 ins=[vapor.DeltaE, B],
@@ -291,8 +291,8 @@ class StageLLE(PhenomeNode, tag='s'):
             subcategory='lle-material',
         )
         self.energy_conservation = phn.EnergyCorrection(
-            ins=[[i.DeltaE for i in ins], [i.dHdE for i in ins]],
-            outs=[extract.DeltaE, dHdEs, DeltaH]
+            ins=[[i.DeltaE for i in ins], [i.dHdE for i in ins], dHdEs, DeltaH],
+            outs=[extract.DeltaE]
         )
         self.energy_parameter_update = phn.EnergyParameterUpdate(
             ins=[extract.DeltaE, extract.T],
@@ -338,8 +338,8 @@ class AggregatedStageLLE(PhenomeNode, tag='s'):
             ins=[Sc, raffinate.Fcp], outs=[extract.Fcp]
         )
         self.energy_conservation = phn.EnergyCorrection(
-            ins=[[i.DeltaE for i in ins], [i.dHdE for i in ins]],
-            outs=[extract.DeltaE, [i.outs[0] for i in self.energy_densities], DeltaH]
+            ins=[[i.DeltaE for i in ins], [i.dHdE for i in ins], [i.outs[0] for i in self.energy_densities], DeltaH],
+            outs=[extract.DeltaE]
         )
         self.energy_parameter_update = phn.EnergyParameterUpdate(
             ins=[extract.DeltaE, extract.T],
@@ -403,8 +403,8 @@ class AggregatedStageVLE(PhenomeNode, tag='s'):
             ins=[Sc, liquid.Fcp], outs=[vapor.Fcp]
         )
         self.energy_conservation = phn.EnergyCorrection(
-            ins=[[i.DeltaE for i in ins], [i.dHdE for i in ins]],
-            outs=[vapor.DeltaE, [vapor.dHdE], DeltaH]
+            ins=[[i.DeltaE for i in ins], [i.dHdE for i in ins], [vapor.dHdE], DeltaH],
+            outs=[vapor.DeltaE]
         )
         self.energy_parameter_update = phn.EnergyParameterUpdate(
             ins=[vapor.DeltaE, B],
@@ -416,7 +416,6 @@ class ShortcutColumn(PhenomeNode, tag='s'):
     
     def prepare(self, ins, outs, location=None):
         vapor, liquid = outs
-        vapor.T = liquid.T
         vapor.Fcp.variable = I.FVc
         liquid.Fcp.variable = I.FLc  
         vapor.no_energy_parameter()
@@ -424,16 +423,25 @@ class ShortcutColumn(PhenomeNode, tag='s'):
         super().prepare(ins, outs)
     
     def load(self):
-        feed, *others = ins = self.ins
+        ins = self.ins
         vapor, liquid = outs = self.outs
-        self.ufunc = phn.Function(
-            ins=[(i.Fcp, i.T, i.P) for i in ins],
-            outs=[I.Sc, vapor.T, liquid.T, I.DeltaP, I.DeltaP],
+        self.HengstebackGaddes = phn.Function(
+            ins=[i.Fcp for i in ins] + [liquid.P, vapor.P],
+            outs=[I.Sc, I.DeltaP],
             subcategory='aggregated',
         )
-        Sc, TV, TL, DPV, DPL = self.ufunc.outs
-        self.liquid_pressure_balance = phn.PressureBalance(ins=[feed.P, DPL], outs=[liquid.P])
-        self.vapor_pressure_balance = phn.PressureBalance(ins=[feed.P, DPV], outs=[vapor.P])
+        self.bubble_point = phn.Function(
+            ins=[liquid.Fcp, liquid.P],
+            outs=[liquid.T],
+            subcategory='vle',
+        )
+        self.dew_point = phn.Function(
+            ins=[vapor.Fcp, vapor.P],
+            outs=[vapor.T],
+            subcategory='vle',
+        ) 
+        Sc, DPV, = self.HengstebackGaddes.outs
+        self.vapor_pressure_balance = phn.PressureBalance(ins=[liquid.P, DPV], outs=[vapor.P])
         self.mass_conservation = phn.MassConservation(
             ins=[i.Fcp for i in ins],
             outs=[i.Fcp for i in outs]
@@ -504,11 +512,13 @@ class MultiStageVLE(PhenomeNode, tag='v'):
     n_ins = 2
     n_outs = 2
     
-    def prepare(self, ins, outs, n_stages, feed_stages=None, abstract_parameters=False):
+    def prepare(self, ins, outs, n_stages, feed_stages=None, abstract_parameters=False,
+                adiabatic=False):
         if feed_stages is None: feed_stages = (0, -1)
         self.feed_stages = feed_stages
         self.n_stages = n_stages
         self.abstract_parameters = abstract_parameters
+        self.adiabatic = adiabatic
         super().prepare(ins, outs)
         
     def load(self):
@@ -536,13 +546,14 @@ class MultiStageVLE(PhenomeNode, tag='v'):
             inlet_streams.append(inlets)
         stage_location = {0: 'top', n_stages-1: 'bottom'}
         abstract_parameters = self.abstract_parameters
+        adiabatic = self.adiabatic
         self.vle_stages = [
             StageVLE(
                 ins=inlet_streams[i],
                 outs=outlet_streams[i],
                 location=stage_location.get(i, 'middle'),
                 abstract_parameters=abstract_parameters,
-                adiabatic=(i!=0) or (i==n_stages-1)
+                adiabatic=adiabatic or (i!=0) or (i==n_stages-1)
             ) for i in range(n_stages)
         ]
         
